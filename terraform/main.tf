@@ -1,5 +1,10 @@
+# --- S3 --- #
+resource "random_id" "bucket_suffix" {
+  byte_length = 4
+}
+
 resource "aws_s3_bucket" "games_export" {
-  bucket = "ddb-games-table-export"
+  bucket = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
   tags   = var.tags
 }
 
@@ -25,13 +30,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "games_export_lifecycle" {
     }
 
     noncurrent_version_expiration {
-      noncurrent_days           = 5
+      noncurrent_days           = 1
       newer_noncurrent_versions = 5
     }
   }
 }
 
-# ── DynamoDB ────────────────────────────────────────────────────────────────
+# --- DynamoDB --- #
 
 resource "aws_dynamodb_table" "games" {
   name         = "Games"
@@ -54,14 +59,10 @@ resource "aws_dynamodb_table" "games" {
     projection_type = "ALL"
   }
 
-  point_in_time_recovery {
-    enabled = true
-  }
-
   tags = var.tags
 }
 
-# ── Lambda: daily DynamoDB → S3 export ─────────────────────────────────────
+# --- Lambda --- #
 
 data "archive_file" "ddb_export_lambda" {
   type        = "zip"
@@ -125,14 +126,14 @@ resource "aws_lambda_function" "ddb_export" {
 
   environment {
     variables = {
-      TABLE_NAME  = aws_dynamodb_table.games.name
-      BUCKET_NAME = aws_s3_bucket.games_export.id
-      EXPORT_KEY  = "snapshot/games_snapshot.ndjson.gz"
+      TABLE_NAME         = aws_dynamodb_table.games.name
+      EXPORT_BUCKET_NAME = aws_s3_bucket.games_export.id
+      EXPORT_KEY         = "snapshot/games_snapshot.json.gz"
     }
   }
 }
 
-# ── EventBridge Scheduler: trigger Lambda daily at 02:00 UTC ───────────────
+# --- EventBridge --- #
 
 resource "aws_iam_role" "ddb_export_scheduler_role" {
   name = "ddb-export-scheduler-role"
@@ -166,7 +167,7 @@ resource "aws_scheduler_schedule" "daily_ddb_export" {
   name       = "daily-ddb-export"
   group_name = "default"
 
-  schedule_expression          = "cron(0 2 * * ? *)"
+  schedule_expression          = "cron(0 0 * * ? *)"
   schedule_expression_timezone = "UTC"
 
   flexible_time_window {
