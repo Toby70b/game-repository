@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: ddb-import
+Version: 0.1.0
+Summary: Lambda job that imports Steam games into the Games DynamoDB table
+Requires-Python: >=3.12
+Provides-Extra: dev
+Requires-Dist: boto3>=1.34; extra == "dev"
+Requires-Dist: boto3-stubs[dynamodb]>=1.34; extra == "dev"
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-mock>=3; extra == "dev"

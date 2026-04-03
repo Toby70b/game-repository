@@ -133,6 +133,77 @@ resource "aws_lambda_function" "ddb_export" {
   }
 }
 
+# --- Lambda (Import) --- #
+
+data "archive_file" "ddb_import_lambda" {
+  type        = "zip"
+  source_dir  = "${path.module}/files/ddb_import"
+  output_path = "${path.module}/files/ddb_import.zip"
+}
+
+resource "aws_iam_role" "ddb_import_lambda_role" {
+  name = "ddb-import-lambda-role"
+  tags = var.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
+  name = "ddb-import-lambda-policy"
+  role = aws_iam_role.ddb_import_lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Query",
+          "dynamodb:BatchWriteItem",
+        ]
+        Resource = [
+          aws_dynamodb_table.games.arn,
+          "${aws_dynamodb_table.games.arn}/index/gsi_steam_game_id",
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "ddb_import" {
+  filename         = data.archive_file.ddb_import_lambda.output_path
+  function_name    = "ddb-games-import"
+  role             = aws_iam_role.ddb_import_lambda_role.arn
+  handler          = "ddb_import.handler"
+  runtime          = "python3.12"
+  source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
+  timeout          = 900 # Steam app list is large — allow up to 15 min
+  tags             = var.tags
+
+  environment {
+    variables = {
+      TABLE_NAME = aws_dynamodb_table.games.name
+      BATCH_SIZE = "25"
+    }
+  }
+}
+
 # --- EventBridge --- #
 
 resource "aws_iam_role" "ddb_export_scheduler_role" {
@@ -177,5 +248,50 @@ resource "aws_scheduler_schedule" "daily_ddb_export" {
   target {
     arn      = aws_lambda_function.ddb_export.arn
     role_arn = aws_iam_role.ddb_export_scheduler_role.arn
+  }
+}
+
+resource "aws_iam_role" "ddb_import_scheduler_role" {
+  name = "ddb-import-scheduler-role"
+  tags = var.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "scheduler.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ddb_import_scheduler_policy" {
+  name = "ddb-import-scheduler-policy"
+  role = aws_iam_role.ddb_import_scheduler_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.ddb_import.arn
+    }]
+  })
+}
+
+resource "aws_scheduler_schedule" "daily_ddb_import" {
+  name       = "daily-ddb-import"
+  group_name = "default"
+
+  schedule_expression          = "cron(0 22 * * ? *)"
+  schedule_expression_timezone = "UTC"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.ddb_import.arn
+    role_arn = aws_iam_role.ddb_import_scheduler_role.arn
   }
 }
