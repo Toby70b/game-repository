@@ -207,7 +207,7 @@ resource "aws_lambda_function" "ddb_import" {
   filename         = data.archive_file.ddb_import_lambda.output_path
   function_name    = "ddb-games-import"
   role             = aws_iam_role.ddb_import_lambda_role.arn
-  handler          = "ddb_import.handler"
+  handler          = "adapters.ddb_import.handler"
   runtime          = "python3.12"
   source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
   timeout          = 900 # Steam app list is large — allow up to 15 min
