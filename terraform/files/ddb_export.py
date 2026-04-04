@@ -35,4 +35,4 @@ def handler(event, context):
     )
 
     logger.info("Exported %d items to s3://%s/%s", len(items), EXPORT_BUCKET_NAME, EXPORT_KEY)
-    return {"statusCode": 200, "itemCount": len(items)}
+    return {"itemCount": len(items)}
