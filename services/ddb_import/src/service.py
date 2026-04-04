@@ -23,7 +23,7 @@ class GameImportService(ImportGamesUseCase):
         self._batch_size = batch_size
 
     def import_games(self) -> dict:
-        existing_ids = self._repo.load_existing_steam_ids()
+        existing_ids = self._repo.retrieve_existing_steam_ids()
 
         total_fetched = 0
         total_skipped = 0

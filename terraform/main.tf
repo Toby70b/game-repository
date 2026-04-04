@@ -62,6 +62,15 @@ resource "aws_dynamodb_table" "games" {
   tags = var.tags
 }
 
+# --- SSM --- #
+
+resource "aws_ssm_parameter" "steam_api_key" {
+  name  = "/game-repository/steam-api-key"
+  type  = "SecureString"
+  value = var.steam_api_key
+  tags  = var.tags
+}
+
 # --- Lambda --- #
 
 data "archive_file" "ddb_export_lambda" {
@@ -137,7 +146,7 @@ resource "aws_lambda_function" "ddb_export" {
 
 data "archive_file" "ddb_import_lambda" {
   type        = "zip"
-  source_dir  = "${path.module}/files/ddb_import"
+  source_dir  = "${path.module}/../services/ddb_import/src"
   output_path = "${path.module}/files/ddb_import.zip"
 }
 
@@ -174,6 +183,11 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
         ]
       },
       {
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = aws_ssm_parameter.steam_api_key.arn
+      },
+      {
         Effect = "Allow"
         Action = [
           "logs:CreateLogGroup",
@@ -198,8 +212,10 @@ resource "aws_lambda_function" "ddb_import" {
 
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.games.name
-      BATCH_SIZE = "25"
+      TABLE_NAME          = aws_dynamodb_table.games.name
+      STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
+      STEAM_API_KEY_PARAM = aws_ssm_parameter.steam_api_key.name
+      BATCH_SIZE          = "25"
     }
   }
 }

@@ -24,8 +24,8 @@ class GameSource(ABC):
     """Outbound port: something that can provide a stream of games."""
 
     @abstractmethod
-    def fetch_games(self) -> Iterator[Game]:
-        """Yield Game objects one at a time."""
+    def fetch_games(self, last_appid: int | None = None) -> Iterator[Game]:
+        """Yield Game objects one at a time. Pass last_appid to resume from a specific offset."""
         ...
 
 
@@ -33,9 +33,8 @@ class GameRepository(ABC):
     """Outbound port: something that can persist games."""
 
     @abstractmethod
-    def load_existing_steam_ids(self) -> set[str]:
-        """Return the set of all steam_game_ids already in the table.
-        Called once at the start of an import run."""
+    def retrieve_existing_steam_ids(self) -> set[str]:
+        """Return the set of all steam_game_ids already existing within the repository."""
         ...
 
     @abstractmethod

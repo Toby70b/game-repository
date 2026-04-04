@@ -8,3 +8,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "steam_api_key" {
+  description = "Steam Web API key stored in SSM Parameter Store"
+  type        = string
+  sensitive   = true
+}

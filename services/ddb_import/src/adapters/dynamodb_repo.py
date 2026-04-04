@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 
 import boto3
@@ -12,19 +13,20 @@ logger = logging.getLogger(__name__)
 class DynamoDbGameRepository(GameRepository):
     """Outbound adapter: persists Game objects to a DynamoDB table."""
 
-    def __init__(self, table_name: str) -> None:
+    def __init__(self) -> None:
         dynamodb = boto3.resource("dynamodb")
-        self._table = dynamodb.Table(table_name)
+        self._table = dynamodb.Table(os.environ["TABLE_NAME"])
+        self._index = os.environ["STEAM_GAME_ID_INDEX"]
 
-    def load_existing_steam_ids(self) -> set[str]:
-        """Paginate through the GSI projecting only steam_game_id, return as a set.
-        One scan instead of one query per game."""
+    def retrieve_existing_steam_ids(self) -> set[str]:
+        """Scan the steam_game_id GSI and paginate through the results, returning
+        a set of all steam_game_ids already present in the table."""
         existing: set[str] = set()
         paginator = self._table.meta.client.get_paginator("scan")
 
         for page in paginator.paginate(
             TableName=self._table.name,
-            IndexName="gsi_steam_game_id",
+            IndexName=self._index,
             ProjectionExpression="steam_game_id",
         ):
             for item in page.get("Items", []):
@@ -36,7 +38,9 @@ class DynamoDbGameRepository(GameRepository):
         return existing
 
     def put_batch(self, games: list[Game]) -> int:
-        """Write up to 25 items using batch_writer (handles retries automatically)."""
+        """Write a list of games to DynamoDB. batch_writer automatically chunks
+        into groups of 25 (the DynamoDB BatchWriteItem limit) and retries any
+        unprocessed items, so this method accepts any size list."""
         written = 0
         with self._table.batch_writer() as batch:
             for game in games:
@@ -47,4 +51,3 @@ class DynamoDbGameRepository(GameRepository):
                 })
                 written += 1
         return written
-
