@@ -18,9 +18,9 @@ class SteamApiAdapter(GameSource):
     """
 
     def __init__(self) -> None:
-        param_name = os.environ["STEAM_API_KEY_PARAM"]
+        steam_api_key_param_name = os.environ["STEAM_API_KEY_PARAM"]
         ssm = boto3.client("ssm")
-        self._api_key = self.retrieve_api_key(param_name, ssm)
+        self._api_key = self.retrieve_api_key(steam_api_key_param_name, ssm)
         self._http = SteamHttpClient()
 
     def retrieve_api_key(self, param_name: str, ssm) -> str:
@@ -36,7 +36,6 @@ class SteamApiAdapter(GameSource):
         cursor = last_appid
         page = 0
         have_more_results = True
-
 
         while have_more_results:
             page += 1

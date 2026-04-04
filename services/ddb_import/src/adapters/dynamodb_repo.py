@@ -37,11 +37,8 @@ class DynamoDbGameRepository(GameRepository):
         logger.info("Loaded %d existing steam_game_ids from table", len(existing))
         return existing
 
-    def put_batch(self, games: list[Game]) -> int:
-        """Write a list of games to DynamoDB. batch_writer automatically chunks
-        into groups of 25 (the DynamoDB BatchWriteItem limit) and retries any
-        unprocessed items, so this method accepts any size list."""
-        written = 0
+    def persist_games(self, games: list[Game]) -> list[Game]:
+        """Write a list of games to DynamoDB. Returns the list of persisted games."""
         with self._table.batch_writer() as batch:
             for game in games:
                 batch.put_item(Item={
@@ -49,5 +46,4 @@ class DynamoDbGameRepository(GameRepository):
                     "steam_game_id": game.steam_game_id,
                     "title": game.title,
                 })
-                written += 1
-        return written
+        return games

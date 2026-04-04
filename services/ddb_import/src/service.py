@@ -7,10 +7,6 @@ logger = logging.getLogger(__name__)
 
 
 class GameImportService(ImportGamesUseCase):
-    """
-    Application service — implements the inbound port and orchestrates the
-    outbound ports. Contains no knowledge of Lambda, HTTP, or DynamoDB.
-    """
 
     def __init__(
         self,
@@ -29,6 +25,7 @@ class GameImportService(ImportGamesUseCase):
         total_skipped = 0
         total_written = 0
         pending: list[Game] = []
+        inserted_games: list[Game] = []
 
         for game in self._source.fetch_games():
             total_fetched += 1
@@ -40,24 +37,21 @@ class GameImportService(ImportGamesUseCase):
             pending.append(game)
 
             if len(pending) >= self._batch_size:
-                total_written += self._flush(pending)
+                total_written += self.persist_games(pending, inserted_games)
                 pending.clear()
 
-        total_written += self._flush(pending)
+        total_written += self.persist_games(pending, inserted_games)
 
         summary = {
-            "statusCode": 200,
-            "totalFetched": total_fetched,
-            "totalSkipped": total_skipped,
-            "totalWritten": total_written,
+            "total games fetched from Steam": total_fetched,
+            "total games skipped due to already existing in persistence": total_skipped,
+            "total games written to persistence": total_written,
         }
         logger.info("Import complete: %s", summary)
         return summary
 
-    def _flush(self, batch: list[Game]) -> int:
+    def persist_games(self, batch: list[Game], inserted_games: list[Game]) -> None:
         if not batch:
             return 0
-        written = self._repo.put_batch(batch)
-        logger.info("Flushed batch of %d item(s) to DynamoDB", written)
-        return written
-
+        persisted = self._repo.persist_games(batch)
+        inserted_games.extend(persisted)

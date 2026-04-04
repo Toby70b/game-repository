@@ -1,14 +1,5 @@
 """
-Lambda handler — inbound adapter.
-
-Hexagonal architecture layers
-──────────────────────────────
-  Domain           : domain/game.py
-  Inbound port     : ports.ImportGamesUseCase
-  Outbound ports   : ports.GameSource, ports.GameRepository
-  Application svc  : service.GameImportService   (implements inbound port)
-  Outbound adapters: adapters/steam_api.py, adapters/dynamodb_repo.py
-  Inbound adapter  : ddb_import.py               (this file — Lambda handler)
+Lambda handler — inbound adapter. Translates the Lambda invocation into a call to the application service.
 """
 
 import logging

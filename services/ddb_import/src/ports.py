@@ -4,7 +4,7 @@ from domain.game import Game
 
 
 # ---------------------------------------------------------------------------
-# Inbound port (driven by the outside world e.g. a Lambda event)
+# Inbound port
 # ---------------------------------------------------------------------------
 
 class ImportGamesUseCase(ABC):
@@ -17,7 +17,7 @@ class ImportGamesUseCase(ABC):
 
 
 # ---------------------------------------------------------------------------
-# Outbound ports (the application drives these)
+# Outbound ports
 # ---------------------------------------------------------------------------
 
 class GameSource(ABC):
@@ -38,7 +38,7 @@ class GameRepository(ABC):
         ...
 
     @abstractmethod
-    def put_batch(self, games: list[Game]) -> int:
+    def persist_games(self, games: list[Game]) -> int:
         """Write a batch of new games. Returns the number of items written."""
         ...
 
