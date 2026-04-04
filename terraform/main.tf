@@ -4,8 +4,9 @@ resource "random_id" "bucket_suffix" {
 }
 
 resource "aws_s3_bucket" "games_export" {
-  bucket = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
-  tags   = var.tags
+  bucket        = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
+  force_destroy = true
+  tags          = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "games_export_versioning" {
@@ -215,11 +216,10 @@ resource "aws_lambda_function" "ddb_import" {
 
   environment {
     variables = {
-      TABLE_NAME          = aws_dynamodb_table.games.name
-      STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
-      STEAM_API_KEY_PARAM = aws_ssm_parameter.steam_api_key.name
-      BATCH_SIZE          = "25"
-    }
+          TABLE_NAME          = aws_dynamodb_table.games.name
+          STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
+          STEAM_API_KEY_PARAM = aws_ssm_parameter.steam_api_key.name
+        }
   }
 }
 

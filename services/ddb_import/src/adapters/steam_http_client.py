@@ -38,7 +38,18 @@ class SteamHttpClient:
             body = response.read()
 
         data = json.loads(body)
-        logger.info("GET %s — response: %s", redacted_url, data)
+        response = data.get("response", {})
+
+        self.log_req_resp(redacted_url, response)
 
         return data
+
+    def log_req_resp(self, redacted_url: str, response):
+        logger.info(
+            "GET %s — apps: %d, have_more_results: %s, last_appid: %s",
+            redacted_url,
+            len(response.get("apps", [])),
+            response.get("have_more_results"),
+            response.get("last_appid"),
+        )
 
