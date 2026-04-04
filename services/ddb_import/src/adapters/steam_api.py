@@ -52,7 +52,7 @@ class SteamApiAdapter(GameSource):
                 if not app_id or not name:
                     continue
 
-                yield Game(steam_game_id=str(app_id), title=name)
+                yield Game(steam_game_id=str(app_id), game_title=name)
 
             if not response.get("have_more_results"):
                 have_more_results = False

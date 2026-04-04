@@ -29,8 +29,16 @@ class SteamHttpClient:
             params["last_appid"] = last_appid
 
         url = f"{_BASE_URL}?{urllib.parse.urlencode(params)}"
-        logger.debug("GET %s", url.replace(api_key, "***"))
+
+        # Don't log the api key
+        redacted_url = url.replace(api_key, "***")
+        logger.info("GET %s", redacted_url)
 
         with urllib.request.urlopen(url, timeout=30) as response:
-            return json.loads(response.read())
+            body = response.read()
+
+        data = json.loads(body)
+        logger.info("GET %s — response: %s", redacted_url, data)
+
+        return data
 

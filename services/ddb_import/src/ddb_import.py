@@ -10,7 +10,7 @@ from service import GameImportService
 from adapters.steam_api import SteamApiAdapter
 from adapters.dynamodb_repo import DynamoDbGameRepository
 
-logging.basicConfig(level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 
 BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "25"))
 

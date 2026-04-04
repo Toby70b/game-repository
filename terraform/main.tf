@@ -131,6 +131,7 @@ resource "aws_lambda_function" "ddb_export" {
   runtime          = "python3.12"
   source_code_hash = data.archive_file.ddb_export_lambda.output_base64sha256
   timeout          = 300
+  memory_size      = 512
   tags             = var.tags
 
   environment {
@@ -174,6 +175,7 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
       {
         Effect = "Allow"
         Action = [
+          "dynamodb:Scan",
           "dynamodb:Query",
           "dynamodb:BatchWriteItem",
         ]
@@ -208,6 +210,7 @@ resource "aws_lambda_function" "ddb_import" {
   runtime          = "python3.12"
   source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
   timeout          = 900 # Steam app list is large — allow up to 15 min
+  memory_size      = 512
   tags             = var.tags
 
   environment {

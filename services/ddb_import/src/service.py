@@ -20,6 +20,7 @@ class GameImportService(ImportGamesUseCase):
 
     def import_games(self) -> dict:
         existing_ids = self._repo.retrieve_existing_steam_ids()
+        last_appid = max((int(sid) for sid in existing_ids), default=None)
 
         total_fetched = 0
         total_skipped = 0
@@ -27,7 +28,7 @@ class GameImportService(ImportGamesUseCase):
         pending: list[Game] = []
         inserted_games: list[Game] = []
 
-        for game in self._source.fetch_games():
+        for game in self._source.fetch_games(last_appid=last_appid):
             total_fetched += 1
 
             if game.steam_game_id in existing_ids:
@@ -50,8 +51,10 @@ class GameImportService(ImportGamesUseCase):
         logger.info("Import complete: %s", summary)
         return summary
 
-    def persist_games(self, batch: list[Game], inserted_games: list[Game]) -> None:
+    def persist_games(self, batch: list[Game], inserted_games: list[Game]) -> int:
         if not batch:
             return 0
         persisted = self._repo.persist_games(batch)
         inserted_games.extend(persisted)
+        logger.info("Flushed batch of %d item(s) to DynamoDB", len(persisted))
+        return len(persisted)
