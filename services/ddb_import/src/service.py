@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 class GameImportService(ImportGamesUseCase):
 
     def __init__(
-        self,
-        source: GameSource,
-        repo: GameRepository,
+            self,
+            source: GameSource,
+            repo: GameRepository,
     ) -> None:
         self._source = source
         self._repo = repo
@@ -21,23 +21,23 @@ class GameImportService(ImportGamesUseCase):
         last_appid = max((int(sid) for sid in existing_ids), default=None)
 
         total_fetched = 0
-        total_skipped = 0
-        pending: list[Game] = []
+        new_games_to_persist: list[Game] = []
 
         for game in self._source.fetch_games(last_appid=last_appid):
             total_fetched += 1
 
-            if game.steam_game_id in existing_ids:
-                total_skipped += 1
-                continue
+            if game.steam_game_id not in existing_ids:
+                new_games_to_persist.append(game)
+            else:
+                logger.warning(
+                    "Game with Steam ID %s retrieved but has already been persisted. This might indicate an error "
+                    "with the Steam API request, specifically with the last_app_id param",
+                    game.steam_game_id)
 
-            pending.append(game)
-
-        persisted = self._repo.persist_games(pending)
+        persisted = self._repo.persist_games(new_games_to_persist)
 
         summary = {
             "total games fetched from Steam": total_fetched,
-            "total games skipped due to already existing in persistence": total_skipped,
             "total games written to persistence": len(persisted),
         }
         logger.info("Import complete: %s", summary)
