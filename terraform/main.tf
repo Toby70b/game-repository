@@ -222,7 +222,6 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
         Effect = "Allow"
         Action = [
           "dynamodb:Scan",
-          "dynamodb:Query",
           "dynamodb:BatchWriteItem",
         ]
         Resource = [
