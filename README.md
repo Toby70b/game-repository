@@ -30,7 +30,7 @@ fresh — one imports new games from the Steam Web API daily, and one exports a 
 | `aws_lambda_function.ddb_export`          | Exports the full table to S3 as gzipped NDJSON                       |
 | `aws_scheduler_schedule.daily_ddb_import` | Triggers import Lambda at **22:00 UTC** daily                        |
 | `aws_scheduler_schedule.daily_ddb_export` | Triggers export Lambda at **00:00 UTC** daily                        |
-| `aws_ssm_parameter.steam_api_key`         | Steam Web API key — pre-created manually, referenced via data source |
+| `aws_ssm_parameter.steam_api_key`         | Pre-created manually — Terraform constructs the ARN from known values and never reads the secret, keeping it out of state |
 
 ---
 

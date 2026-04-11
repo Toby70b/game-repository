@@ -5,6 +5,8 @@ from ports import ImportGamesUseCase, GameSource, GameRepository
 
 logger = logging.getLogger(__name__)
 
+_BATCH_SIZE = 100
+
 
 class GameImportService(ImportGamesUseCase):
 
@@ -21,24 +23,28 @@ class GameImportService(ImportGamesUseCase):
         last_appid = max((int(sid) for sid in existing_ids), default=None)
 
         total_fetched = 0
-        new_games_to_persist: list[Game] = []
+        total_persisted = 0
+        batch: list[Game] = []
 
         for game in self._source.fetch_games(last_appid=last_appid):
             total_fetched += 1
-
             if game.steam_game_id not in existing_ids:
-                new_games_to_persist.append(game)
-            else:
-                logger.warning(
-                    "Game with Steam ID %s retrieved but has already been persisted. This might indicate an error "
-                    "with the Steam API request, specifically with the last_appid param",
-                    game.steam_game_id)
+                batch.append(game)
 
-        persisted = self._repo.persist_games(new_games_to_persist)
+            if len(batch) >= _BATCH_SIZE:
+                persisted = self._repo.persist_games(batch)
+                total_persisted += len(persisted)
+                logger.info("Flushed batch of %d games (%d persisted so far)", len(batch), total_persisted)
+                batch.clear()
+
+        # Flush any remaining games that didn't fill a full batch
+        if batch:
+            persisted = self._repo.persist_games(batch)
+            total_persisted += len(persisted)
 
         summary = {
             "total games fetched from Steam": total_fetched,
-            "total games written to persistence": len(persisted),
+            "total games written to persistence": total_persisted,
         }
         logger.info("Import complete: %s", summary)
         return summary

@@ -64,10 +64,14 @@ resource "aws_dynamodb_table" "games" {
 }
 
 # --- SSM --- #
+# The parameter is created out-of-band (see README). Terraform never reads the
+# value — only the name and a constructed ARN are used — so the secret is never
+# written into Terraform state.
+data "aws_caller_identity" "current" {}
 
-data "aws_ssm_parameter" "steam_api_key" {
-  name            = "/game-repository/steam-api-key"
-  with_decryption = true
+locals {
+  steam_api_key_param_name = "/game-repository/steam-api-key"
+  steam_api_key_param_arn  = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${local.steam_api_key_param_name}"
 }
 
 # --- Lambda Export Job --- #
@@ -230,7 +234,7 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
       {
         Effect   = "Allow"
         Action   = ["ssm:GetParameter"]
-        Resource = data.aws_ssm_parameter.steam_api_key.arn
+        Resource = local.steam_api_key_param_arn
       },
       {
         Effect = "Allow"
@@ -260,7 +264,7 @@ resource "aws_lambda_function" "ddb_import" {
     variables = {
           TABLE_NAME          = aws_dynamodb_table.games.name
           STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
-          STEAM_API_KEY_PARAM = data.aws_ssm_parameter.steam_api_key.name
+          STEAM_API_KEY_PARAM = local.steam_api_key_param_name
         }
   }
 }
