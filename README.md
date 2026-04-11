@@ -22,15 +22,15 @@ fresh — one imports new games from the Steam Web API daily, and one exports a 
 
 ## AWS Resources
 
-| Resource                                  | Description                                                       |
-|-------------------------------------------|-------------------------------------------------------------------|
-| `aws_dynamodb_table.games`                | `Games` table — hash key `game_id` (UUID), GSI on `steam_game_id` |
-| `aws_s3_bucket.games_export`              | Snapshot bucket with versioning and lifecycle rules               |
-| `aws_lambda_function.ddb_import`          | Imports new Steam games into DynamoDB                             |
-| `aws_lambda_function.ddb_export`          | Exports the full table to S3 as gzipped NDJSON                    |
-| `aws_scheduler_schedule.daily_ddb_import` | Triggers import Lambda at **22:00 UTC** daily                     |
-| `aws_scheduler_schedule.daily_ddb_export` | Triggers export Lambda at **00:00 UTC** daily                     |
-| `aws_ssm_parameter.steam_api_key`         | Steam Web API key stored as a `SecureString`                      |
+| Resource                                  | Description                                                          |
+|-------------------------------------------|----------------------------------------------------------------------|
+| `aws_dynamodb_table.games`                | `Games` table — hash key `game_id` (UUID), GSI on `steam_game_id`    |
+| `aws_s3_bucket.games_export`              | Snapshot bucket with versioning and lifecycle rules                  |
+| `aws_lambda_function.ddb_import`          | Imports new Steam games into DynamoDB                                |
+| `aws_lambda_function.ddb_export`          | Exports the full table to S3 as gzipped NDJSON                       |
+| `aws_scheduler_schedule.daily_ddb_import` | Triggers import Lambda at **22:00 UTC** daily                        |
+| `aws_scheduler_schedule.daily_ddb_export` | Triggers export Lambda at **00:00 UTC** daily                        |
+| `aws_ssm_parameter.steam_api_key`         | Steam Web API key — pre-created manually, referenced via data source |
 
 ---
 
@@ -56,10 +56,20 @@ The `ddb_import` service is structured around hexagonal (ports & adapters) archi
 
 ## Getting Started
 
-### 1. Configure Terraform Variables
+### 1. Create the Steam API key SSM parameter
 
-Non-sensitive defaults are committed in `terraform/terraform.tfvars`. Create a separate file for secrets that should
-**not** be committed.
+The Steam API key is managed outside of Terraform to keep the secret value out of Terraform state. Create it once
+before running `terraform apply`:
+
+```bash
+aws ssm put-parameter \
+  --name "/game-repository/steam-api-key" \
+  --value "your-steam-api-key-here" \
+  --type SecureString \
+  --region your-region-here
+```
+
+> The parameter name must match exactly — Terraform references it via a data source at `/game-repository/steam-api-key`.
 
 ### 2. Deploy
 
@@ -75,7 +85,6 @@ Terraform will:
 - Create the `Games` DynamoDB table
 - Create the S3 snapshot bucket
 - Package and deploy both Lambda functions
-- Store the Steam API key in SSM Parameter Store
 - Configure EventBridge schedules for both jobs
 
 ### 3. When finished destroy
@@ -83,8 +92,13 @@ Terraform will:
 ```bash
 terraform destroy
 ```
----
 
+> The SSM parameter is not managed by Terraform so it will **not** be deleted by `terraform destroy` — remove it
+> manually if needed:
+> ```bash
+> aws ssm delete-parameter --name "/game-repository/steam-api-key" --region eu-west-2
+> ```
+---
 
 ## Lambda Packaging
 
