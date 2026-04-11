@@ -46,18 +46,24 @@ class DynamoDbGameRepository(GameRepository):
         """Scan the steam_game_id GSI and paginate through the results, returning
         a set of all steam_game_ids already present in the table."""
         existing: set[str] = set()
-        paginator = self._table.meta.client.get_paginator("scan")
+        scan_kwargs = {
+            "IndexName": self._index,
+            "ProjectionExpression": "steam_game_id",
+        }
 
-        for page in paginator.paginate(
-            TableName=self._table.name,
-            IndexName=self._index,
-            ProjectionExpression="steam_game_id",
-        ):
+        while True:
+            page = self._table.scan(**scan_kwargs)
+
             for item in page.get("Items", []):
                 sid = item.get("steam_game_id")
                 if sid:
                     existing.add(sid)
 
+            last_evaluated_key = page.get("LastEvaluatedKey")
+            if not last_evaluated_key:
+                break
+
+            scan_kwargs["ExclusiveStartKey"] = last_evaluated_key
         logger.info("Loaded %d existing steam_game_ids from table", len(existing))
         return existing
 
