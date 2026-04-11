@@ -38,7 +38,7 @@ class GameRepository(ABC):
         ...
 
     @abstractmethod
-    def persist_games(self, games: list[Game]) -> int:
-        """Write a batch of new games. Returns the number of items written."""
+    def persist_games(self, games: list[Game]) -> list[Game]:
+        """Write a batch of new games. Returns the persisted games."""
         ...
 
