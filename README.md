@@ -16,6 +16,7 @@ fresh — one imports new games from the Steam Web API daily, and one exports a 
 
 ## Architecture Overview
 
+<img width="821" height="540" alt="Game Repository drawio (1)" src="https://github.com/user-attachments/assets/ba584cb4-9ba6-4412-b065-80d47cfb74d9" />
 
 ---
 
