@@ -31,7 +31,7 @@ class GameImportService(ImportGamesUseCase):
             else:
                 logger.warning(
                     "Game with Steam ID %s retrieved but has already been persisted. This might indicate an error "
-                    "with the Steam API request, specifically with the last_app_id param",
+                    "with the Steam API request, specifically with the last_appid param",
                     game.steam_game_id)
 
         persisted = self._repo.persist_games(new_games_to_persist)
