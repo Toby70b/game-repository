@@ -7,4 +7,6 @@
 */package-lock.json
 */dist/
 */.idea
-
+*.egg-info/
+**/ddb_export.zip
+**/ddb_import.zip

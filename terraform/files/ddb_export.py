@@ -1,11 +1,15 @@
 import boto3
 import gzip
 import json
+import logging
 import os
 
 TABLE_NAME = os.environ["TABLE_NAME"]
 EXPORT_BUCKET_NAME = os.environ["EXPORT_BUCKET_NAME"]
 EXPORT_KEY = os.environ["EXPORT_KEY"]
+
+logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 ddb = boto3.client("dynamodb")
 s3 = boto3.client("s3")
@@ -30,5 +34,5 @@ def handler(event, context):
         ContentType="application/json",
     )
 
-    print(f"Exported {len(items)} items to s3://{EXPORT_BUCKET_NAME}/{EXPORT_KEY}")
-    return {"statusCode": 200, "itemCount": len(items)}
+    logger.info("Exported %d items to s3://%s/%s", len(items), EXPORT_BUCKET_NAME, EXPORT_KEY)
+    return {"itemCount": len(items)}
