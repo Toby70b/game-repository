@@ -230,7 +230,7 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
       {
         Effect   = "Allow"
         Action   = ["ssm:GetParameter"]
-        Resource = data.aws_ssm_parameter.steam_api_key
+        Resource = data.aws_ssm_parameter.steam_api_key.arn
       },
       {
         Effect = "Allow"
