@@ -34,22 +34,22 @@ class SteamHttpClient:
         redacted_url = url.replace(api_key, "***")
         logger.info("GET %s", redacted_url)
 
-        with urllib.request.urlopen(url, timeout=30) as response:
-            body = response.read()
+        with urllib.request.urlopen(url, timeout=30) as http_response:
+            body = http_response.read()
 
         data = json.loads(body)
-        response = data.get("response", {})
+        payload = data.get("response", {})
 
-        self.log_req_resp(redacted_url, response)
+        self.log_req_resp(redacted_url, payload)
 
         return data
 
-    def log_req_resp(self, redacted_url: str, response):
+    def log_req_resp(self, redacted_url: str, payload):
         logger.info(
             "GET %s — apps: %d, have_more_results: %s, last_appid: %s",
             redacted_url,
-            len(response.get("apps", [])),
-            response.get("have_more_results"),
-            response.get("last_appid"),
+            len(payload.get("apps", [])),
+            payload.get("have_more_results"),
+            payload.get("last_appid"),
         )
 
