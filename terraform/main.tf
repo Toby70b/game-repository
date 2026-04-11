@@ -230,7 +230,7 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
       {
         Effect   = "Allow"
         Action   = ["ssm:GetParameter"]
-        Resource = s
+        Resource = data.aws_ssm_parameter.steam_api_key
       },
       {
         Effect = "Allow"
@@ -260,7 +260,7 @@ resource "aws_lambda_function" "ddb_import" {
     variables = {
           TABLE_NAME          = aws_dynamodb_table.games.name
           STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
-          STEAM_API_KEY_PARAM = data.aws_ssm_parameter.steam_api_key
+          STEAM_API_KEY_PARAM = data.aws_ssm_parameter.steam_api_key.name
         }
   }
 }
