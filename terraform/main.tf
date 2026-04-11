@@ -65,11 +65,9 @@ resource "aws_dynamodb_table" "games" {
 
 # --- SSM --- #
 
-resource "aws_ssm_parameter" "steam_api_key" {
-  name  = "/game-repository/steam-api-key"
-  type  = "SecureString"
-  value = var.steam_api_key
-  tags  = var.tags
+data "aws_ssm_parameter" "steam_api_key" {
+  name            = "/game-repository/steam-api-key"
+  with_decryption = true
 }
 
 # --- Lambda Export Job --- #
