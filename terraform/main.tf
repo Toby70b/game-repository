@@ -72,7 +72,7 @@ resource "aws_ssm_parameter" "steam_api_key" {
   tags  = var.tags
 }
 
-# --- Lambda --- #
+# --- Lambda Export Job --- #
 
 data "archive_file" "ddb_export_lambda" {
   type        = "zip"
@@ -144,7 +144,52 @@ resource "aws_lambda_function" "ddb_export" {
   }
 }
 
-# --- Lambda (Import) --- #
+resource "aws_iam_role" "ddb_export_scheduler_role" {
+  name = "ddb-export-scheduler-role"
+  tags = var.tags
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "scheduler.amazonaws.com" }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "ddb_export_scheduler_policy" {
+  name = "ddb-export-scheduler-policy"
+  role = aws_iam_role.ddb_export_scheduler_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = "lambda:InvokeFunction"
+      Resource = aws_lambda_function.ddb_export.arn
+    }]
+  })
+}
+
+resource "aws_scheduler_schedule" "daily_ddb_export" {
+  name       = "daily-ddb-export"
+  group_name = "default"
+
+  schedule_expression          = "cron(0 0 * * ? *)"
+  schedule_expression_timezone = "UTC"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.ddb_export.arn
+    role_arn = aws_iam_role.ddb_export_scheduler_role.arn
+  }
+}
+
+# --- Lambda Import Job --- #
 
 data "archive_file" "ddb_import_lambda" {
   type        = "zip"
@@ -220,53 +265,6 @@ resource "aws_lambda_function" "ddb_import" {
           STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
           STEAM_API_KEY_PARAM = aws_ssm_parameter.steam_api_key.name
         }
-  }
-}
-
-# --- EventBridge --- #
-
-resource "aws_iam_role" "ddb_export_scheduler_role" {
-  name = "ddb-export-scheduler-role"
-  tags = var.tags
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect    = "Allow"
-      Action    = "sts:AssumeRole"
-      Principal = { Service = "scheduler.amazonaws.com" }
-    }]
-  })
-}
-
-resource "aws_iam_role_policy" "ddb_export_scheduler_policy" {
-  name = "ddb-export-scheduler-policy"
-  role = aws_iam_role.ddb_export_scheduler_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect   = "Allow"
-      Action   = "lambda:InvokeFunction"
-      Resource = aws_lambda_function.ddb_export.arn
-    }]
-  })
-}
-
-resource "aws_scheduler_schedule" "daily_ddb_export" {
-  name       = "daily-ddb-export"
-  group_name = "default"
-
-  schedule_expression          = "cron(0 0 * * ? *)"
-  schedule_expression_timezone = "UTC"
-
-  flexible_time_window {
-    mode = "OFF"
-  }
-
-  target {
-    arn      = aws_lambda_function.ddb_export.arn
-    role_arn = aws_iam_role.ddb_export_scheduler_role.arn
   }
 }
 
