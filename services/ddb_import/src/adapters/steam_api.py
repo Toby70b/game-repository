@@ -28,7 +28,10 @@ class SteamApiAdapter(GameSource):
             response = ssm.get_parameter(Name=param_name, WithDecryption=True)
             return response["Parameter"]["Value"]
         except Exception as e:
-            logger.error(f"Failed to retrieve Steam API key from SSM parameter '{param_name}': {e}")
+            logger.exception(
+                "Failed to retrieve Steam API key from SSM parameter '%s'",
+                param_name,
+            )
             raise RuntimeError(f"Could not retrieve Steam API key from SSM parameter '{param_name}'") from e
 
     def fetch_games(self, last_appid: int | None = None) -> Iterator[Game]:
