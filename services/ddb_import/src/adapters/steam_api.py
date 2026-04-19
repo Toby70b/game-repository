@@ -20,10 +20,10 @@ class SteamApiAdapter(GameSource):
     def __init__(self) -> None:
         steam_api_key_param_name = os.environ["STEAM_API_KEY_PARAM"]
         ssm = boto3.client("ssm")
-        self._api_key = self.__retrieve_api_key(steam_api_key_param_name, ssm)
+        self._api_key = self._retrieve_api_key(steam_api_key_param_name, ssm)
         self._http = SteamHttpClient()
 
-    def __retrieve_api_key(self, param_name: str, ssm) -> str:
+    def _retrieve_api_key(self, param_name: str, ssm) -> str:
         try:
             response = ssm.get_parameter(Name=param_name, WithDecryption=True)
             return response["Parameter"]["Value"]
