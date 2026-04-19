@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/IStoreService/GetAppList/v1/",
+    "queryParameters": {
+      "last_appid": { "absent": true }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "response": {
+        "apps": [
+          { "appid": 10, "name": "Game 1", "last_modified": 1773408379, "price_change_number": 33005693 },
+          { "appid": 20, "name": "Game 2", "last_modified": 1767152424, "price_change_number": 33022737 }
+        ],
+        "have_more_results": true,
+        "last_appid": 20
+      }
+    }
+  }
+}
+

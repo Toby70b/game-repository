@@ -262,10 +262,11 @@ resource "aws_lambda_function" "ddb_import" {
 
   environment {
     variables = {
-          TABLE_NAME          = aws_dynamodb_table.games.name
-          STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
-          STEAM_API_KEY_PARAM = local.steam_api_key_param_name
-        }
+      TABLE_NAME          = aws_dynamodb_table.games.name
+      STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
+      STEAM_API_KEY_PARAM = local.steam_api_key_param_name
+      STEAM_API_BASE_URL  = var.steam_api_base_url
+    }
   }
 }
 

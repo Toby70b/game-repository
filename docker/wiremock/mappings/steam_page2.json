@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/IStoreService/GetAppList/v1/",
+    "queryParameters": {
+      "last_appid": { "equalTo": "20" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "response": {
+        "apps": [
+          { "appid": 30, "name": "Game 3", "last_modified": 1776518739, "price_change_number": 0 }
+        ]
+      }
+    }
+  }
+}
+

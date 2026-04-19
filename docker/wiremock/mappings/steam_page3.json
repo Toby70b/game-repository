@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/IStoreService/GetAppList/v1/",
+    "queryParameters": {
+      "last_appid": { "equalTo": "30" }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "response": {}
+    }
+  }
+}
+

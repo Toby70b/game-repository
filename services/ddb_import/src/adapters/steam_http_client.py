@@ -1,11 +1,13 @@
 import json
 import logging
+import os
 import urllib.parse
 import urllib.request
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
+_BASE_HOST = os.environ.get("STEAM_API_BASE_URL", "https://api.steampowered.com")
+_PATH = "/IStoreService/GetAppList/v1/"
 _MAX_RESULTS = 50000
 
 
@@ -28,7 +30,7 @@ class SteamHttpClient:
         if last_appid is not None:
             params["last_appid"] = last_appid
 
-        url = f"{_BASE_URL}?{urllib.parse.urlencode(params)}"
+        url = f"{_BASE_HOST.rstrip('/')}{_PATH}?{urllib.parse.urlencode(params)}"
 
         # Don't log the api key
         redacted_url = url.replace(api_key, "***")
