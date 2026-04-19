@@ -10,3 +10,5 @@
 *.egg-info/
 **/ddb_export.zip
 **/ddb_import.zip
+**/__pycache__/
+**/*.pyc
