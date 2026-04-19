@@ -12,7 +12,7 @@
     "jsonBody": {
       "response": {
         "apps": [
-          { "appid": 30, "name": "Game3", "last_modified": 1776518739, "price_change_number": 0 }
+          { "appid": 30, "name": "Game 3", "last_modified": 1776518739, "price_change_number": 0 }
         ]
       }
     }
