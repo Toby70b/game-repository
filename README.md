@@ -157,16 +157,9 @@ This starts:
 
 ### Create the Steam API key in LocalStack
 
-Before deploying with Terraform, create the SSM parameter in LocalStack:
-
-```bash
-aws --endpoint-url=http://localhost:4566 --region eu-west-2 ssm put-parameter \
-  --name "/game-repository/steam-api-key" \
-  --value "dummy-local-key" \
-  --type SecureString
-```
-
-> The actual key value doesn't matter for local testing since WireMock doesn't validate it.
+The Steam API key is already created in LocalStack by the init script as the SSM parameter
+`/game-repository/steam-api-key`, which is the parameter name Terraform configures the Lambda to read. The
+actual key value doesn't matter for local testing since WireMock doesn't validate it.
 
 ### Deploy infrastructure to LocalStack
 

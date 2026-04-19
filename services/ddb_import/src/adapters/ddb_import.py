@@ -6,7 +6,7 @@ import logging
 import os
 
 from ports import ImportGamesUseCase
-from service import GameImportService
+from game_import_service import GameImportService
 from adapters.steam_api import SteamApiAdapter
 from adapters.dynamodb_repo import DynamoDbGameRepository
 
