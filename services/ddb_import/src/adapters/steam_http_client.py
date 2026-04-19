@@ -1,11 +1,12 @@
 import json
 import logging
+import os
 import urllib.parse
 import urllib.request
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
+_BASE_URL = os.environ.get("STEAM_API_BASE_URL", "https://api.steampowered.com/IStoreService/GetAppList/v1/")
 _MAX_RESULTS = 50000
 
 
