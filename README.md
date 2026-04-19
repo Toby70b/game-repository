@@ -138,7 +138,7 @@ account.
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
 - [terraform-local](https://docs.localstack.cloud/user-guide/integrations/terraform/) (`pip install terraform-local`)
-- A LocalStack account 
+- A LocalStack account (`LOCALSTACK_AUTH_TOKEN` environment variable must be set, see [LocalStack docs](https://docs.localstack.cloud/getting-started/installation/#docker) for details)
 
 ### Start the stack
 
