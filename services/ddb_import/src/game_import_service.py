@@ -32,7 +32,7 @@ class GameImportService(ImportGamesUseCase):
                 batch.append(game)
 
             if len(batch) >= _BATCH_SIZE:
-                persisted = self._repo.persist_games(batch)
+                persisted = self._repo.persist_games(list(batch))
                 total_persisted += len(persisted)
                 logger.info("Flushed batch of %d games (%d persisted so far)", len(batch), total_persisted)
                 batch.clear()
