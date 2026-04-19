@@ -13,8 +13,8 @@ class TestSteamHttpClient:
 
         mock_response = MagicMock()
         mock_response.read.return_value = response_body
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
 
         with patch("adapters.steam_http_client.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
             client = SteamHttpClient()
@@ -33,8 +33,8 @@ class TestSteamHttpClient:
 
         mock_response = MagicMock()
         mock_response.read.return_value = response_body
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
 
         with patch("adapters.steam_http_client.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
             client = SteamHttpClient()
@@ -50,8 +50,8 @@ class TestSteamHttpClient:
 
         mock_response = MagicMock()
         mock_response.read.return_value = response_body
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
 
         with patch("adapters.steam_http_client.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
             client = SteamHttpClient()
@@ -66,8 +66,8 @@ class TestSteamHttpClient:
 
         mock_response = MagicMock()
         mock_response.read.return_value = response_body
-        mock_response.__enter__ = lambda s: s
-        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
 
         with patch("adapters.steam_http_client.urllib.request.urlopen", return_value=mock_response):
             client = SteamHttpClient()
