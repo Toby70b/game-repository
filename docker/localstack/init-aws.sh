@@ -6,6 +6,7 @@ awslocal ssm put-parameter \
   --name "/steam/api-key" \
   --value "dummy-steam-api-key" \
   --type "SecureString" \
+  --region eu-west-2 \
   --overwrite
 
 echo "LocalStack init complete."
