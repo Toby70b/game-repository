@@ -43,6 +43,9 @@ module "games_table" {
   source = "./modules/dynamodb_table"
   table_name = "Games"
   hash_key   = "game_id"
+  stream_enabled = true
+  # Only capture new items added to the table
+  stream_view_type = "NEW_IMAGE"
 
   attributes = [
     {

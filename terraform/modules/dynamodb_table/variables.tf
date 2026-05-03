@@ -16,6 +16,18 @@ variable "attributes" {
     description = "A list of attributes to define for the DynamoDB table. Each attribute should have a name and a type (e.g. 'S' for string, 'N' for number)."
 }
 
+variable "stream_enabled" {
+  type = bool
+  description = "Whether to enable DynamoDB Streams on the table"
+  default = false
+}
+
+variable "stream_view_type" {
+  type = string
+  description = "The view type for the DynamoDB stream (e.g. NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES, KEYS_ONLY). Required if stream_enabled is true."
+  default = null
+}
+
 variable "global_secondary_index" {
   type = object({
     name            = string
