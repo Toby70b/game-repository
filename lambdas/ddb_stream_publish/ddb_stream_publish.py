@@ -48,7 +48,7 @@ def lambda_handler(event, context):
         sns.publish(
             TopicArn=TOPIC_ARN,
             Message=json.dumps(game_event),
-            Subject="new game event"
+            Subject="new_game_item_"
         )
 
         logger.info(f"Successfully published game event {game_event['event_id']} to SNS")
