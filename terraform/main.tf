@@ -410,6 +410,12 @@ resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
   function_name     = aws_lambda_function.new_game_item_publisher.arn
   starting_position = "TRIM_HORIZON" # process all existing stream records on deployment
 
+  # Batch settings -  need to consider initial setup scenario
+  batch_size                         = 100
+  maximum_batching_window_in_seconds = 5
+  # Default seeing - Reduce throttle errors during bulk load
+  parallelization_factor = 1
+
   tags = var.tags
 }
 

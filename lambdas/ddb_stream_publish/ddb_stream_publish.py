@@ -4,10 +4,13 @@ import os
 import boto3
 import logging
 from boto3.dynamodb.types import TypeDeserializer
+import uuid
 
 sns = boto3.client("sns")
 deserializer = TypeDeserializer()
 TOPIC_ARN = os.environ["TOPIC_ARN"]
+NEW_GAME_ITEM_EVENT_SUBJECT = "new_game_item"
+SNS_BATCH_SIZE_LIMIT = 10
 
 sns = boto3.client("sns")
 logging.getLogger().setLevel(logging.INFO)
@@ -36,20 +39,39 @@ def createGameEvent(record: dict) -> dict:
     return game_event
 
 def lambda_handler(event, context):
-    for record in event['Records']:
-        logger.info(record['eventID'])
-        logger.info(record['eventName'])
-        logger.info("DynamoDB Record: " + json.dumps(record['dynamodb'], indent=2))
+    records = event['Records']
+    logger.info('Received {} records from DynamoDB stream.'.format(len(records)))
+    record_chunks = [records[i:i + SNS_BATCH_SIZE_LIMIT] for i in range(0, len(records), SNS_BATCH_SIZE_LIMIT)]
+    logger.debug('Splitting records into {} chunks of size {}'.format(len(record_chunks), SNS_BATCH_SIZE_LIMIT))
 
-        game_event = createGameEvent(record)
+    for chunk in record_chunks:
+        new_game_item_event_publish_entries = []
+        for record in chunk:
+            logger.info(record['eventID'])
+            logger.info(record['eventName'])
+            logger.info("DynamoDB Record: " + json.dumps(record['dynamodb'], indent=2))
 
-        logger.info("Publishing game event to SNS: " + json.dumps(game_event, indent=2))
+            try:
+                game_event = createGameEvent(record)
+            except ValueError as e:
+                # In the future, we can DLQ but skip for now...
+                logger.warning(f"Error deserializing record {record['eventID']} it will not be published: {e}")
+                continue
 
-        sns.publish(
+            logger.info("Creating batch entry for game event: " + json.dumps(game_event, indent=2))
+
+            game_event_publish_entry = {
+                'Id': str(uuid.uuid4()),
+                'Message': json.dumps(game_event),
+                'Subject': NEW_GAME_ITEM_EVENT_SUBJECT
+            }
+
+            new_game_item_event_publish_entries.append(game_event_publish_entry)
+
+        sns.publish_batch (
             TopicArn=TOPIC_ARN,
-            Message=json.dumps(game_event),
-            Subject="new_game_item_"
+            PublishBatchRequestEntries=new_game_item_event_publish_entries
         )
 
-        logger.info(f"Successfully published game event {game_event['event_id']} to SNS")
-    logger.info('Successfully processed {} records.'.format(len(event['Records'])))
+        logger.info('Successfully published batch of {} events to SNS'.format(len(chunk)))
+    logger.info('Successfully processed {} records.'.format(len(records)))
