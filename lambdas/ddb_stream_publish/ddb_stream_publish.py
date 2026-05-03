@@ -1,5 +1,5 @@
 import json
-import time
+from datetime import datetime, timezone
 import os
 import boto3
 import logging
@@ -7,7 +7,7 @@ from boto3.dynamodb.types import TypeDeserializer
 
 sns = boto3.client("sns")
 deserializer = TypeDeserializer()
-TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
+TOPIC_ARN = os.environ["TOPIC_ARN"]
 
 sns = boto3.client("sns")
 logging.getLogger().setLevel(logging.INFO)
@@ -21,7 +21,7 @@ def deserialize(dynamo_obj: dict) -> dict:
 def createGameEvent(record: dict) -> dict:
     event_id = record['eventID']
     event_name = record['eventName']
-    current_timestamp = time.time()
+    current_timestamp = datetime.now(timezone.utc).isoformat()
     if "NewImage" not in record["dynamodb"]:
         raise ValueError(f"No NewImage found in record {event_id} — cannot process {event_name} event.")
 
@@ -52,4 +52,4 @@ def lambda_handler(event, context):
         )
 
         logger.info(f"Successfully published game event {game_event['event_id']} to SNS")
-    return 'Successfully processed {} records.'.format(len(event['Records']))
+    logger.info('Successfully processed {} records.'.format(len(event['Records'])))

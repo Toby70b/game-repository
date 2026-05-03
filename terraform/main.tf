@@ -133,11 +133,12 @@ resource "aws_iam_role_policy" "ddb_export_lambda_policy" {
 
 resource "aws_lambda_function" "ddb_export" {
   filename         = data.archive_file.ddb_export_lambda.output_path
+  source_code_hash = data.archive_file.ddb_export_lambda.output_base64sha256
+
   function_name    = "ddb-games-export"
   role             = aws_iam_role.ddb_export_lambda_role.arn
   handler          = "ddb_export.handler"
   runtime          = "python3.12"
-  source_code_hash = data.archive_file.ddb_export_lambda.output_base64sha256
   timeout          = 300
   memory_size      = 512
   tags             = var.tags
@@ -256,11 +257,12 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
 
 resource "aws_lambda_function" "ddb_import" {
   filename         = data.archive_file.ddb_import_lambda.output_path
+  source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
+
   function_name    = "ddb-games-import"
   role             = aws_iam_role.ddb_import_lambda_role.arn
   handler          = "adapters.ddb_import.handler"
   runtime          = "python3.12"
-  source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
   timeout          = 900 # Steam app list is large — allow up to 15 min
   memory_size      = 512
   tags             = var.tags
@@ -326,3 +328,88 @@ module "new_game_items" {
   topic_name = "new-game-items"
   tags = var.tags
 }
+
+# --- Lambda (publish to SNS) --- #
+data "archive_file" "ddb_new_game_item_publisher_lambda" {
+  type        = "zip"
+  source_file = "${path.module}/../lambdas/ddb_stream_publish/ddb_stream_publish.py"
+  output_path = "${path.module}/files/ddb_stream_publish.zip"
+}
+
+resource "aws_lambda_function" "new_game_item_publisher" {
+    filename         = data.archive_file.ddb_new_game_item_publisher_lambda.output_path
+    source_code_hash = data.archive_file.ddb_new_game_item_publisher_lambda.output_base64sha256
+
+    function_name    = "new-game-item-publisher"
+    role             = aws_iam_role.new_game_item_publisher.arn
+    handler          = "ddb_stream_publish.lambda_handler"
+    runtime          = "python3.12"
+    timeout          = 30
+    memory_size      = 128
+    tags             = var.tags
+
+    environment {
+        variables = {
+          TOPIC_ARN = module.new_game_items.topic_arn
+        }
+    }
+}
+
+resource "aws_iam_role" "new_game_item_publisher" {
+  name = "new-game-item-publisher-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Action    = "sts:AssumeRole"
+      Principal = { Service = "lambda.amazonaws.com" }
+    }]
+  })
+
+  tags = var.tags
+}
+
+resource "aws_iam_role_policy" "new_game_item_publisher" {
+  name = "new-game-item-publisher-policy"
+
+  role   = aws_iam_role.new_game_item_publisher.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "sns:Publish"
+        Resource = module.new_game_items.topic_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetRecords",
+          "dynamodb:GetShardIterator",
+          "dynamodb:DescribeStream",
+          "dynamodb:ListStreams"
+        ]
+        Resource = module.games_table.stream_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
+  event_source_arn  = module.games_table.stream_arn
+  function_name     = aws_lambda_function.new_game_item_publisher.arn
+  starting_position = "TRIM_HORIZON" # process all existing stream records on deployment
+
+  tags = var.tags
+}
+
