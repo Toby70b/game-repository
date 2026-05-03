@@ -55,7 +55,7 @@ resource "aws_dynamodb_table" "games" {
   }
 
   global_secondary_index {
-    name            = "gsi_steam_game_id"
+    name            = local.steam_gsi_name
     hash_key        = "steam_game_id"
     projection_type = "ALL"
   }
@@ -72,13 +72,14 @@ data "aws_caller_identity" "current" {}
 locals {
   steam_api_key_param_name = "/game-repository/steam-api-key"
   steam_api_key_param_arn  = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${local.steam_api_key_param_name}"
+  steam_gsi_name           = "gsi_steam_game_id"
 }
 
 # --- Lambda Export Job --- #
 
 data "archive_file" "ddb_export_lambda" {
   type        = "zip"
-  source_file = "${path.module}/files/ddb_export.py"
+  source_file = "${path.module}/../lambdas/ddb_export/ddb_export.py"
   output_path = "${path.module}/files/ddb_export.zip"
 }
 
@@ -195,7 +196,7 @@ resource "aws_scheduler_schedule" "daily_ddb_export" {
 
 data "archive_file" "ddb_import_lambda" {
   type        = "zip"
-  source_dir  = "${path.module}/../services/ddb_import/src"
+  source_dir  = "${path.module}/../lambdas/ddb_import/src"
   output_path = "${path.module}/files/ddb_import.zip"
 }
 
@@ -228,7 +229,7 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
         ]
         Resource = [
           aws_dynamodb_table.games.arn,
-          "${aws_dynamodb_table.games.arn}/index/gsi_steam_game_id",
+          "${aws_dynamodb_table.games.arn}/index/${local.steam_gsi_name}",
         ]
       },
       {
@@ -263,7 +264,7 @@ resource "aws_lambda_function" "ddb_import" {
   environment {
     variables = {
       TABLE_NAME          = aws_dynamodb_table.games.name
-      STEAM_GAME_ID_INDEX = "gsi_steam_game_id"
+      STEAM_GAME_ID_INDEX = local.steam_gsi_name
       STEAM_API_KEY_PARAM = local.steam_api_key_param_name
       STEAM_API_BASE_URL  = var.steam_api_base_url
     }
