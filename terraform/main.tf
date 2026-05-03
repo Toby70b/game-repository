@@ -319,3 +319,10 @@ resource "aws_scheduler_schedule" "daily_ddb_import" {
     role_arn = aws_iam_role.ddb_import_scheduler_role.arn
   }
 }
+
+# --- SNS --- #
+module "sns_topic" "new_game_items" {
+  source = "./modules/sns_topic"
+  name = "new-game-items"
+  tags = var.tags
+}
