@@ -323,6 +323,6 @@ resource "aws_scheduler_schedule" "daily_ddb_import" {
 # --- SNS --- #
 module "new_game_items" {
   source = "./modules/sns_topic"
-  name = "new-game-items"
+  topic_name = "new-game-items"
   tags = var.tags
 }
