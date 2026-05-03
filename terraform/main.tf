@@ -39,28 +39,29 @@ resource "aws_s3_bucket_lifecycle_configuration" "games_export_lifecycle" {
 
 # --- DynamoDB --- #
 
-resource "aws_dynamodb_table" "games" {
-  name         = "Games"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "game_id"
+module "games_table" {
+  source = "./modules/dynamodb_table"
+  table_name = "Games"
+  hash_key   = "game_id"
 
-  attribute {
-    name = "game_id"
-    type = "S"
-  }
+  attributes = [
+    {
+      name = "game_id"
+      type = "S"
+    },
+    {
+      name = "steam_game_id"
+      type = "S"
+    }
+  ]
 
-  attribute {
-    name = "steam_game_id"
-    type = "S"
-  }
-
-  global_secondary_index {
+  global_secondary_index = {
     name            = local.steam_gsi_name
     hash_key        = "steam_game_id"
     projection_type = "ALL"
   }
 
-  tags = var.tags
+  tags   = var.tags
 }
 
 # --- SSM --- #
@@ -107,7 +108,7 @@ resource "aws_iam_role_policy" "ddb_export_lambda_policy" {
       {
         Effect   = "Allow"
         Action   = ["dynamodb:Scan"]
-        Resource = aws_dynamodb_table.games.arn
+        Resource = module.games_table.table_arn
       },
       {
         Effect   = "Allow"
@@ -140,7 +141,7 @@ resource "aws_lambda_function" "ddb_export" {
 
   environment {
     variables = {
-      TABLE_NAME         = aws_dynamodb_table.games.name
+      TABLE_NAME         = module.games_table.table_name
       EXPORT_BUCKET_NAME = aws_s3_bucket.games_export.id
       EXPORT_KEY         = "snapshot/games_snapshot.json.gz"
     }
@@ -228,8 +229,8 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
           "dynamodb:BatchWriteItem",
         ]
         Resource = [
-          aws_dynamodb_table.games.arn,
-          "${aws_dynamodb_table.games.arn}/index/${local.steam_gsi_name}",
+          module.games_table.table_arn,
+          "${module.games_table.table_arn}/index/${local.steam_gsi_name}",
         ]
       },
       {
@@ -263,7 +264,7 @@ resource "aws_lambda_function" "ddb_import" {
 
   environment {
     variables = {
-      TABLE_NAME          = aws_dynamodb_table.games.name
+      TABLE_NAME          = module.games_table.table_name
       STEAM_GAME_ID_INDEX = local.steam_gsi_name
       STEAM_API_KEY_PARAM = local.steam_api_key_param_name
       STEAM_API_BASE_URL  = var.steam_api_base_url
