@@ -5,7 +5,6 @@ resource "random_id" "bucket_suffix" {
 
 resource "aws_s3_bucket" "games_export" {
   bucket        = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
-  force_destroy = true
   tags          = var.tags
 }
 
