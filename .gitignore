@@ -8,7 +8,6 @@
 */dist/
 */.idea
 *.egg-info/
-**/ddb_export.zip
-**/ddb_import.zip
+**/*.zip
 **/__pycache__/
 **/*.pyc
