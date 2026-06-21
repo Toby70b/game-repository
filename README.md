@@ -25,12 +25,12 @@ streams new game additions to an SNS topic in real time.
 
 | Resource                                          | Description                                                                                                               |
 |---------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------|
-| `aws_dynamodb_table.games`                        | `Games` table — hash key `game_id` (UUID), GSI on `steam_game_id`, DynamoDB Streams enabled (`NEW_IMAGE`)                |
+| `module.games_table`                              | `Games` table — hash key `game_id` (UUID), GSI on `steam_game_id`, DynamoDB Streams enabled (`NEW_IMAGE`)                |
 | `aws_s3_bucket.games_export`                      | Snapshot bucket with versioning and lifecycle rules                                                                       |
 | `aws_lambda_function.ddb_import`                  | Imports new Steam games into DynamoDB                                                                                     |
 | `aws_lambda_function.ddb_export`                  | Exports the full table to S3 as gzipped NDJSON                                                                            |
 | `aws_lambda_function.new_game_item_publisher`     | Reads new-item events from the DynamoDB stream and publishes them to SNS in batches                                       |
-| `aws_sns_topic.new_game_items`                    | SNS topic (`new-game-items`) that receives new game item events from the stream publisher                                 |
+| `module.new_game_items`                           | SNS topic (`new-game-items`) that receives new game item events from the stream publisher                                 |
 | `aws_lambda_event_source_mapping` (stream)        | Wires the DynamoDB stream to `new-game-item-publisher` (batch size 100, window 5 s)                                       |
 | `aws_scheduler_schedule.daily_ddb_import`         | Triggers import Lambda at **22:00 UTC** daily                                                                             |
 | `aws_scheduler_schedule.daily_ddb_export`         | Triggers export Lambda at **00:00 UTC** daily                                                                             |

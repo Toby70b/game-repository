@@ -9,7 +9,9 @@ from boto3.dynamodb.types import TypeDeserializer
 
 sns = boto3.client("sns")
 deserializer = TypeDeserializer()
-TOPIC_ARN = os.environ["TOPIC_ARN"]
+TOPIC_ARN = os.environ.get("TOPIC_ARN")
+if not TOPIC_ARN:
+    raise EnvironmentError("Missing required environment variable: TOPIC_ARN")
 NEW_GAME_ITEM_EVENT_SUBJECT = "new_game_item"
 SNS_BATCH_SIZE_LIMIT = 10
 
@@ -58,7 +60,7 @@ def lambda_handler(event, context):
                 logger.warning(f"Error deserializing record {record['eventID']} it will not be published: {e}")
                 continue
 
-            logger.info("Creating batch entry for game event: " + json.dumps(game_event, indent=2))
+            logger.debug("Creating batch entry for game event: " + json.dumps(game_event, indent=2))
 
             game_event_publish_entry = {
                 'Id': str(uuid.uuid4()),

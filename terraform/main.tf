@@ -416,7 +416,7 @@ resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
   # Batch settings - need to consider initial setup scenario
   batch_size                         = 100
   maximum_batching_window_in_seconds = 5
-  # Default seeing - reduce throttle errors during bulk load
+  # Default setting - reduce throttle errors during bulk load
   parallelization_factor = 1
 
   tags = var.tags

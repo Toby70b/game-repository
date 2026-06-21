@@ -1,5 +1,6 @@
 import json
 import os
+import importlib
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -39,6 +40,30 @@ def make_record_no_new_image(event_id: str = "evt-del", event_name: str = "REMOV
         "eventName": event_name,
         "dynamodb": {},
     }
+
+
+# ---------------------------------------------------------------------------
+# Module initialisation
+# ---------------------------------------------------------------------------
+
+class TestModuleInit:
+
+    def test_missing_topic_arn_raises_environment_error(self):
+        import sys
+        env_backup = os.environ.pop("TOPIC_ARN", None)
+        sys.modules.pop("ddb_stream_publish", None)
+        try:
+            with patch("boto3.client", return_value=MagicMock()):
+                with pytest.raises(EnvironmentError, match="Missing required environment variable: TOPIC_ARN"):
+                    importlib.import_module("ddb_stream_publish")
+        finally:
+            if env_backup is not None:
+                os.environ["TOPIC_ARN"] = env_backup
+            sys.modules.pop("ddb_stream_publish", None)
+            # Re-import the module in its normal state for subsequent tests
+            os.environ.setdefault("TOPIC_ARN", "arn:aws:sns:eu-west-2:123456789012:new-game-items")
+            with patch("boto3.client", return_value=MagicMock()):
+                importlib.import_module("ddb_stream_publish")
 
 
 # ---------------------------------------------------------------------------
