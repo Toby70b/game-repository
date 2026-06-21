@@ -45,3 +45,16 @@ class GameRepository(ABC):
         need writing. Returns the games written."""
         ...
 
+
+class LastImportTimestampStore(ABC):
+    """Outbound port: used to manage the last import timestamp."""
+
+    @abstractmethod
+    def get_last_import_timestamp(self) -> str | None:
+        """Return the last import timestamp as a string, or None if not set."""
+        ...
+
+    @abstractmethod
+    def set_last_import_timestamp(self, timestamp: str) -> None:
+        """Set the last import timestamp to the given string."""
+        ...

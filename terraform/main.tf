@@ -283,6 +283,7 @@ resource "aws_lambda_function" "ddb_import" {
       STEAM_GAME_ID_INDEX = local.steam_gsi_name
       STEAM_API_KEY_PARAM = local.steam_api_key_param_name
       STEAM_API_BASE_URL  = var.steam_api_base_url
+      LAST_MODIFIED_PARAM  = aws_ssm_parameter.last_import_job_timestamp.name
     }
   }
 }
