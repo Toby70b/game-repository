@@ -1,7 +1,6 @@
 import json
 from datetime import datetime, timezone
 import os
-import boto3
 import logging
 from boto3.dynamodb.types import TypeDeserializer
 import uuid
@@ -68,10 +67,12 @@ def lambda_handler(event, context):
 
             new_game_item_event_publish_entries.append(game_event_publish_entry)
 
-        sns.publish_batch (
-            TopicArn=TOPIC_ARN,
-            PublishBatchRequestEntries=new_game_item_event_publish_entries
-        )
-
-        logger.info('Successfully published batch of {} events to SNS'.format(len(chunk)))
+        if new_game_item_event_publish_entries:
+            sns.publish_batch(
+                TopicArn=TOPIC_ARN,
+                PublishBatchRequestEntries=new_game_item_event_publish_entries
+            )
+            logger.info('Successfully published batch of {} events to SNS'.format(len(new_game_item_event_publish_entries)))
+        else:
+            logger.info('No publishable events in this chunk — skipping SNS publish')
     logger.info('Successfully processed {} records.'.format(len(records)))

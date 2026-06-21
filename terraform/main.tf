@@ -4,8 +4,8 @@ resource "random_id" "bucket_suffix" {
 }
 
 resource "aws_s3_bucket" "games_export" {
-  bucket        = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
-  tags          = var.tags
+  bucket = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
+  tags   = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "games_export_versioning" {
@@ -39,11 +39,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "games_export_lifecycle" {
 # --- DynamoDB --- #
 
 module "games_table" {
-  source = "./modules/dynamodb_table"
-  table_name = "Games"
-  hash_key   = "game_id"
+  source         = "./modules/dynamodb_table"
+  table_name     = "Games"
+  hash_key       = "game_id"
   stream_enabled = true
-  # Only capture new items added to the table
+  # Only want to capture the item post-modification for the stream publisher lambda
   stream_view_type = "NEW_IMAGE"
 
   attributes = [
@@ -63,7 +63,7 @@ module "games_table" {
     projection_type = "ALL"
   }
 
-  tags   = var.tags
+  tags = var.tags
 }
 
 # --- SSM --- #
@@ -134,13 +134,13 @@ resource "aws_lambda_function" "ddb_export" {
   filename         = data.archive_file.ddb_export_lambda.output_path
   source_code_hash = data.archive_file.ddb_export_lambda.output_base64sha256
 
-  function_name    = "ddb-games-export"
-  role             = aws_iam_role.ddb_export_lambda_role.arn
-  handler          = "ddb_export.handler"
-  runtime          = "python3.12"
-  timeout          = 300
-  memory_size      = 512
-  tags             = var.tags
+  function_name = "ddb-games-export"
+  role          = aws_iam_role.ddb_export_lambda_role.arn
+  handler       = "ddb_export.handler"
+  runtime       = "python3.12"
+  timeout       = 300
+  memory_size   = 512
+  tags          = var.tags
 
   environment {
     variables = {
@@ -258,13 +258,13 @@ resource "aws_lambda_function" "ddb_import" {
   filename         = data.archive_file.ddb_import_lambda.output_path
   source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
 
-  function_name    = "ddb-games-import"
-  role             = aws_iam_role.ddb_import_lambda_role.arn
-  handler          = "adapters.ddb_import.handler"
-  runtime          = "python3.12"
-  timeout          = 900 # Steam app list is large — allow up to 15 min
-  memory_size      = 512
-  tags             = var.tags
+  function_name = "ddb-games-import"
+  role          = aws_iam_role.ddb_import_lambda_role.arn
+  handler       = "adapters.ddb_import.handler"
+  runtime       = "python3.12"
+  timeout       = 900 # Steam app list is large — allow up to 15 min
+  memory_size   = 512
+  tags          = var.tags
 
   environment {
     variables = {
@@ -323,9 +323,9 @@ resource "aws_scheduler_schedule" "daily_ddb_import" {
 
 # --- SNS --- #
 module "new_game_items" {
-  source = "./modules/sns_topic"
+  source     = "./modules/sns_topic"
   topic_name = "new-game-items"
-  tags = var.tags
+  tags       = var.tags
 }
 
 # --- Lambda (publish to SNS) --- #
@@ -336,22 +336,22 @@ data "archive_file" "ddb_new_game_item_publisher_lambda" {
 }
 
 resource "aws_lambda_function" "new_game_item_publisher" {
-    filename         = data.archive_file.ddb_new_game_item_publisher_lambda.output_path
-    source_code_hash = data.archive_file.ddb_new_game_item_publisher_lambda.output_base64sha256
+  filename         = data.archive_file.ddb_new_game_item_publisher_lambda.output_path
+  source_code_hash = data.archive_file.ddb_new_game_item_publisher_lambda.output_base64sha256
 
-    function_name    = "new-game-item-publisher"
-    role             = aws_iam_role.new_game_item_publisher.arn
-    handler          = "ddb_stream_publish.lambda_handler"
-    runtime          = "python3.12"
-    timeout          = 30
-    memory_size      = 128
-    tags             = var.tags
+  function_name = "new-game-item-publisher"
+  role          = aws_iam_role.new_game_item_publisher.arn
+  handler       = "ddb_stream_publish.lambda_handler"
+  runtime       = "python3.12"
+  timeout       = 30
+  memory_size   = 128
+  tags          = var.tags
 
-    environment {
-        variables = {
-          TOPIC_ARN = module.new_game_items.topic_arn
-        }
+  environment {
+    variables = {
+      TOPIC_ARN = module.new_game_items.topic_arn
     }
+  }
 }
 
 resource "aws_iam_role" "new_game_item_publisher" {
@@ -372,7 +372,7 @@ resource "aws_iam_role" "new_game_item_publisher" {
 resource "aws_iam_role_policy" "new_game_item_publisher" {
   name = "new-game-item-publisher-policy"
 
-  role   = aws_iam_role.new_game_item_publisher.id
+  role = aws_iam_role.new_game_item_publisher.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -387,9 +387,13 @@ resource "aws_iam_role_policy" "new_game_item_publisher" {
           "dynamodb:GetRecords",
           "dynamodb:GetShardIterator",
           "dynamodb:DescribeStream",
-          "dynamodb:ListStreams"
         ]
         Resource = module.games_table.stream_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:ListStreams"]
+        Resource = "*"
       },
       {
         Effect = "Allow"
@@ -409,10 +413,10 @@ resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
   function_name     = aws_lambda_function.new_game_item_publisher.arn
   starting_position = "TRIM_HORIZON" # process all existing stream records on deployment
 
-  # Batch settings -  need to consider initial setup scenario
+  # Batch settings - need to consider initial setup scenario
   batch_size                         = 100
   maximum_batching_window_in_seconds = 5
-  # Default seeing - Reduce throttle errors during bulk load
+  # Default seeing - reduce throttle errors during bulk load
   parallelization_factor = 1
 
   tags = var.tags
