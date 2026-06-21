@@ -24,6 +24,10 @@ class GameImportService(ImportGamesUseCase):
     def import_games(self) -> dict:
         existing = self._repo.existing_titles()
 
+        last_import_timestamp = self._timestamp_store.get_last_import_timestamp()
+        if last_import_timestamp is None:
+            raise RuntimeError("Last import timestamp could not be retrieved; cannot proceed with import")
+
         last_appid = max((int(sid) for sid in existing), default=None)
 
         total_fetched = 0
@@ -58,6 +62,6 @@ class GameImportService(ImportGamesUseCase):
         return summary
 
     def __update_last_modified_timestamp(self) -> None:
-        new_timestamp = int(datetime.now(timezone.utc).timestamp())
+        new_timestamp = str(int(datetime.now(timezone.utc).timestamp()))
         logger.info("Updating last modified timestamp param to %d", new_timestamp)
-        self._timestamp_store.set_last_timestamp(new_timestamp)
+        self._timestamp_store.set_last_import_timestamp(new_timestamp)
