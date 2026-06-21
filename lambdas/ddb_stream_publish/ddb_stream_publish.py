@@ -1,18 +1,20 @@
 import json
 from datetime import datetime, timezone
 import os
-import boto3
 import logging
-from boto3.dynamodb.types import TypeDeserializer
 import uuid
+
+import boto3
+from boto3.dynamodb.types import TypeDeserializer
 
 sns = boto3.client("sns")
 deserializer = TypeDeserializer()
-TOPIC_ARN = os.environ["TOPIC_ARN"]
+TOPIC_ARN = os.environ.get("TOPIC_ARN")
+if not TOPIC_ARN:
+    raise EnvironmentError("Missing required environment variable: TOPIC_ARN")
 NEW_GAME_ITEM_EVENT_SUBJECT = "new_game_item"
 SNS_BATCH_SIZE_LIMIT = 10
 
-sns = boto3.client("sns")
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ def deserialize(dynamo_obj: dict) -> dict:
     return {k: deserializer.deserialize(v) for k, v in dynamo_obj.items()}
 
 
-def createGameEvent(record: dict) -> dict:
+def create_game_event(record: dict) -> dict:
     event_id = record['eventID']
     event_name = record['eventName']
     current_timestamp = datetime.now(timezone.utc).isoformat()
@@ -52,13 +54,13 @@ def lambda_handler(event, context):
             logger.info("DynamoDB Record: " + json.dumps(record['dynamodb'], indent=2))
 
             try:
-                game_event = createGameEvent(record)
+                game_event = create_game_event(record)
             except ValueError as e:
                 # In the future, we can DLQ but skip for now...
                 logger.warning(f"Error deserializing record {record['eventID']} it will not be published: {e}")
                 continue
 
-            logger.info("Creating batch entry for game event: " + json.dumps(game_event, indent=2))
+            logger.debug("Creating batch entry for game event: " + json.dumps(game_event, indent=2))
 
             game_event_publish_entry = {
                 'Id': str(uuid.uuid4()),
@@ -68,10 +70,24 @@ def lambda_handler(event, context):
 
             new_game_item_event_publish_entries.append(game_event_publish_entry)
 
-        sns.publish_batch (
-            TopicArn=TOPIC_ARN,
-            PublishBatchRequestEntries=new_game_item_event_publish_entries
-        )
-
-        logger.info('Successfully published batch of {} events to SNS'.format(len(chunk)))
+        if new_game_item_event_publish_entries:
+            response = sns.publish_batch(
+                TopicArn=TOPIC_ARN,
+                PublishBatchRequestEntries=new_game_item_event_publish_entries
+            )
+            failed = response.get("Failed", [])
+            if failed:
+                for failure in failed:
+                    logger.error(
+                        "Failed to publish event Id=%s — Code=%s Message=%s",
+                        failure.get("Id"),
+                        failure.get("Code"),
+                        failure.get("Message"),
+                    )
+                raise RuntimeError(
+                    f"{len(failed)} of {len(new_game_item_event_publish_entries)} events failed to publish to SNS."
+                )
+            logger.info('Successfully published batch of {} events to SNS'.format(len(new_game_item_event_publish_entries)))
+        else:
+            logger.info('No publishable events in this chunk — skipping SNS publish')
     logger.info('Successfully processed {} records.'.format(len(records)))

@@ -43,7 +43,7 @@ module "games_table" {
   table_name     = "Games"
   hash_key       = "game_id"
   stream_enabled = true
-  # Only capture new items added to the table
+  # Only want to capture the item post-modification for the stream publisher lambda
   stream_view_type = "NEW_IMAGE"
 
   attributes = [
@@ -75,8 +75,7 @@ data "aws_caller_identity" "current" {}
 locals {
   steam_api_key_param_name = "/game-repository/steam-api-key"
   steam_api_key_param_arn  = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${local.steam_api_key_param_name}"
-
-  steam_gsi_name = "gsi_steam_game_id"
+  steam_gsi_name           = "gsi_steam_game_id"
 }
 
 # --- Lambda Export Job --- #
@@ -399,9 +398,13 @@ resource "aws_iam_role_policy" "new_game_item_publisher" {
           "dynamodb:GetRecords",
           "dynamodb:GetShardIterator",
           "dynamodb:DescribeStream",
-          "dynamodb:ListStreams"
         ]
         Resource = module.games_table.stream_arn
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["dynamodb:ListStreams"]
+        Resource = "*"
       },
       {
         Effect = "Allow"
@@ -421,10 +424,10 @@ resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
   function_name     = aws_lambda_function.new_game_item_publisher.arn
   starting_position = "TRIM_HORIZON" # process all existing stream records on deployment
 
-  # Batch settings -  need to consider initial setup scenario
+  # Batch settings - need to consider initial setup scenario
   batch_size                         = 100
   maximum_batching_window_in_seconds = 5
-  # Default seeing - Reduce throttle errors during bulk load
+  # Default setting - reduce throttle errors during bulk load
   parallelization_factor = 1
 
   tags = var.tags
@@ -439,4 +442,5 @@ resource "aws_ssm_parameter" "last_import_job_timestamp" {
 
   tags = var.tags
 }
+
 
