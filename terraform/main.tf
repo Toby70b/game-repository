@@ -4,8 +4,8 @@ resource "random_id" "bucket_suffix" {
 }
 
 resource "aws_s3_bucket" "games_export" {
-  bucket        = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
-  tags          = var.tags
+  bucket = "ddb-games-table-export-${random_id.bucket_suffix.hex}"
+  tags   = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "games_export_versioning" {
@@ -39,9 +39,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "games_export_lifecycle" {
 # --- DynamoDB --- #
 
 module "games_table" {
-  source = "./modules/dynamodb_table"
-  table_name = "Games"
-  hash_key   = "game_id"
+  source         = "./modules/dynamodb_table"
+  table_name     = "Games"
+  hash_key       = "game_id"
   stream_enabled = true
   # Only capture new items added to the table
   stream_view_type = "NEW_IMAGE"
@@ -63,7 +63,7 @@ module "games_table" {
     projection_type = "ALL"
   }
 
-  tags   = var.tags
+  tags = var.tags
 }
 
 # --- SSM --- #
@@ -75,7 +75,8 @@ data "aws_caller_identity" "current" {}
 locals {
   steam_api_key_param_name = "/game-repository/steam-api-key"
   steam_api_key_param_arn  = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter${local.steam_api_key_param_name}"
-  steam_gsi_name           = "gsi_steam_game_id"
+
+  steam_gsi_name = "gsi_steam_game_id"
 }
 
 # --- Lambda Export Job --- #
@@ -134,13 +135,13 @@ resource "aws_lambda_function" "ddb_export" {
   filename         = data.archive_file.ddb_export_lambda.output_path
   source_code_hash = data.archive_file.ddb_export_lambda.output_base64sha256
 
-  function_name    = "ddb-games-export"
-  role             = aws_iam_role.ddb_export_lambda_role.arn
-  handler          = "ddb_export.handler"
-  runtime          = "python3.12"
-  timeout          = 300
-  memory_size      = 512
-  tags             = var.tags
+  function_name = "ddb-games-export"
+  role          = aws_iam_role.ddb_export_lambda_role.arn
+  handler       = "ddb_export.handler"
+  runtime       = "python3.12"
+  timeout       = 300
+  memory_size   = 512
+  tags          = var.tags
 
   environment {
     variables = {
@@ -237,9 +238,19 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = ["ssm:GetParameter"]
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+        ]
         Resource = local.steam_api_key_param_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:PutParameter",
+        ]
+        Resource = aws_ssm_parameter.last_import_job_timestamp.arn
       },
       {
         Effect = "Allow"
@@ -258,13 +269,13 @@ resource "aws_lambda_function" "ddb_import" {
   filename         = data.archive_file.ddb_import_lambda.output_path
   source_code_hash = data.archive_file.ddb_import_lambda.output_base64sha256
 
-  function_name    = "ddb-games-import"
-  role             = aws_iam_role.ddb_import_lambda_role.arn
-  handler          = "adapters.ddb_import.handler"
-  runtime          = "python3.12"
-  timeout          = 900 # Steam app list is large — allow up to 15 min
-  memory_size      = 512
-  tags             = var.tags
+  function_name = "ddb-games-import"
+  role          = aws_iam_role.ddb_import_lambda_role.arn
+  handler       = "adapters.ddb_import.handler"
+  runtime       = "python3.12"
+  timeout       = 900 # Steam app list is large — allow up to 15 min
+  memory_size   = 512
+  tags          = var.tags
 
   environment {
     variables = {
@@ -323,9 +334,9 @@ resource "aws_scheduler_schedule" "daily_ddb_import" {
 
 # --- SNS --- #
 module "new_game_items" {
-  source = "./modules/sns_topic"
+  source     = "./modules/sns_topic"
   topic_name = "new-game-items"
-  tags = var.tags
+  tags       = var.tags
 }
 
 # --- Lambda (publish to SNS) --- #
@@ -336,22 +347,22 @@ data "archive_file" "ddb_new_game_item_publisher_lambda" {
 }
 
 resource "aws_lambda_function" "new_game_item_publisher" {
-    filename         = data.archive_file.ddb_new_game_item_publisher_lambda.output_path
-    source_code_hash = data.archive_file.ddb_new_game_item_publisher_lambda.output_base64sha256
+  filename         = data.archive_file.ddb_new_game_item_publisher_lambda.output_path
+  source_code_hash = data.archive_file.ddb_new_game_item_publisher_lambda.output_base64sha256
 
-    function_name    = "new-game-item-publisher"
-    role             = aws_iam_role.new_game_item_publisher.arn
-    handler          = "ddb_stream_publish.lambda_handler"
-    runtime          = "python3.12"
-    timeout          = 30
-    memory_size      = 128
-    tags             = var.tags
+  function_name = "new-game-item-publisher"
+  role          = aws_iam_role.new_game_item_publisher.arn
+  handler       = "ddb_stream_publish.lambda_handler"
+  runtime       = "python3.12"
+  timeout       = 30
+  memory_size   = 128
+  tags          = var.tags
 
-    environment {
-        variables = {
-          TOPIC_ARN = module.new_game_items.topic_arn
-        }
+  environment {
+    variables = {
+      TOPIC_ARN = module.new_game_items.topic_arn
     }
+  }
 }
 
 resource "aws_iam_role" "new_game_item_publisher" {
@@ -372,7 +383,7 @@ resource "aws_iam_role" "new_game_item_publisher" {
 resource "aws_iam_role_policy" "new_game_item_publisher" {
   name = "new-game-item-publisher-policy"
 
-  role   = aws_iam_role.new_game_item_publisher.id
+  role = aws_iam_role.new_game_item_publisher.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -414,6 +425,16 @@ resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
   maximum_batching_window_in_seconds = 5
   # Default seeing - Reduce throttle errors during bulk load
   parallelization_factor = 1
+
+  tags = var.tags
+}
+
+# --- SSM --- #
+resource "aws_ssm_parameter" "last_import_job_timestamp" {
+  name        = "/game-repository/last-import-job-timestamp"
+  type        = "String"
+  value       = "0"
+  description = "Timestamp of the last successful import job run. Used by the import job to find newly update Steam games to import"
 
   tags = var.tags
 }
