@@ -10,10 +10,11 @@ def game(steam_id: str, title: str) -> Game:
 
 class TestGameImportService:
 
-    def _make_service(self, *, source=None, repo=None):
+    def _make_service(self, *, source=None, repo=None, timestamp_store=None):
         return GameImportService(
             source=source or MagicMock(),
             repo=repo or MagicMock(),
+            timestamp_store=timestamp_store or MagicMock(),
         )
 
     # ---- No games from source ----
@@ -137,3 +138,5 @@ class TestGameImportService:
         svc.import_games()
 
         source.fetch_games.assert_called_once_with(last_appid=None)
+
+
