@@ -22,82 +22,96 @@ class TestGameImportService:
         source = MagicMock()
         source.fetch_games.return_value = iter([])
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = set()
+        repo.existing_titles.return_value = {}
 
         svc = self._make_service(source=source, repo=repo)
         result = svc.import_games()
 
         assert result["total games fetched from Steam"] == 0
         assert result["total games written to persistence"] == 0
-        repo.persist_games.assert_not_called()
+        repo.upsert_games.assert_not_called()
 
     # ---- All games are new ----
 
-    def test_new_games_are_persisted(self):
+    def test_new_games_are_written(self):
         games = [game("10", "Game A"), game("20", "Game B")]
         source = MagicMock()
         source.fetch_games.return_value = iter(games)
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = set()
-        repo.persist_games.side_effect = lambda batch: batch
+        repo.existing_titles.return_value = {}
+        repo.upsert_games.side_effect = lambda batch: batch
 
         svc = self._make_service(source=source, repo=repo)
         result = svc.import_games()
 
         assert result["total games fetched from Steam"] == 2
         assert result["total games written to persistence"] == 2
-        repo.persist_games.assert_called_once_with(games)
+        repo.upsert_games.assert_called_once_with(games)
 
-    # ---- Duplicate games are filtered ----
+    # ---- Change detection lives in the service ----
 
-    def test_existing_games_are_skipped(self):
+    def test_unchanged_games_are_skipped(self):
         games = [game("10", "Game A"), game("20", "Game B")]
         source = MagicMock()
         source.fetch_games.return_value = iter(games)
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = {"10"}
-        repo.persist_games.side_effect = lambda batch: batch
+        repo.existing_titles.return_value = {"10": "Game A"}  # "10" unchanged, "20" new
+        repo.upsert_games.side_effect = lambda batch: batch
 
         svc = self._make_service(source=source, repo=repo)
         result = svc.import_games()
 
         assert result["total games fetched from Steam"] == 2
         assert result["total games written to persistence"] == 1
-        repo.persist_games.assert_called_once_with([game("20", "Game B")])
+        repo.upsert_games.assert_called_once_with([game("20", "Game B")])
 
-    def test_all_duplicates_means_nothing_persisted(self):
+    def test_changed_title_is_written(self):
+        games = [game("10", "New Title")]
+        source = MagicMock()
+        source.fetch_games.return_value = iter(games)
+        repo = MagicMock()
+        repo.existing_titles.return_value = {"10": "Old Title"}
+        repo.upsert_games.side_effect = lambda batch: batch
+
+        svc = self._make_service(source=source, repo=repo)
+        result = svc.import_games()
+
+        assert result["total games fetched from Steam"] == 1
+        assert result["total games written to persistence"] == 1
+        repo.upsert_games.assert_called_once_with([game("10", "New Title")])
+
+    def test_all_unchanged_writes_nothing(self):
         games = [game("10", "Game A"), game("20", "Game B")]
         source = MagicMock()
         source.fetch_games.return_value = iter(games)
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = {"10", "20"}
+        repo.existing_titles.return_value = {"10": "Game A", "20": "Game B"}
 
         svc = self._make_service(source=source, repo=repo)
         result = svc.import_games()
 
         assert result["total games fetched from Steam"] == 2
         assert result["total games written to persistence"] == 0
-        repo.persist_games.assert_not_called()
+        repo.upsert_games.assert_not_called()
 
     # ---- Batching ----
 
     def test_large_set_is_batched(self):
-        """With _BATCH_SIZE=100, 250 games should produce 3 persist calls (100+100+50)."""
+        """With _BATCH_SIZE=100, 250 new games should produce 3 upsert calls (100+100+50)."""
         games = [game(str(i), f"Game {i}") for i in range(250)]
         source = MagicMock()
         source.fetch_games.return_value = iter(games)
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = set()
-        repo.persist_games.side_effect = lambda batch: batch
+        repo.existing_titles.return_value = {}
+        repo.upsert_games.side_effect = lambda batch: batch
 
         svc = self._make_service(source=source, repo=repo)
         result = svc.import_games()
 
         assert result["total games fetched from Steam"] == 250
         assert result["total games written to persistence"] == 250
-        assert repo.persist_games.call_count == 3
-        # Verify batch sizes
-        batch_sizes = [len(call.args[0]) for call in repo.persist_games.call_args_list]
+        assert repo.upsert_games.call_count == 3
+        batch_sizes = [len(call.args[0]) for call in repo.upsert_games.call_args_list]
         assert batch_sizes == [100, 100, 50]
 
     # ---- Cursor / last_appid ----
@@ -106,7 +120,7 @@ class TestGameImportService:
         source = MagicMock()
         source.fetch_games.return_value = iter([])
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = {"5", "200", "30"}
+        repo.existing_titles.return_value = {"5": "a", "200": "b", "30": "c"}
 
         svc = self._make_service(source=source, repo=repo)
         svc.import_games()
@@ -117,10 +131,9 @@ class TestGameImportService:
         source = MagicMock()
         source.fetch_games.return_value = iter([])
         repo = MagicMock()
-        repo.retrieve_existing_steam_ids.return_value = set()
+        repo.existing_titles.return_value = {}
 
         svc = self._make_service(source=source, repo=repo)
         svc.import_games()
 
         source.fetch_games.assert_called_once_with(last_appid=None)
-

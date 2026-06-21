@@ -33,12 +33,15 @@ class GameRepository(ABC):
     """Outbound port: something that can persist games."""
 
     @abstractmethod
-    def retrieve_existing_steam_ids(self) -> set[str]:
-        """Return the set of all steam_game_ids already existing within the repository."""
+    def existing_titles(self) -> dict[str, str]:
+        """Return a map of steam_game_id -> current game_title for every game
+        already in the repository."""
         ...
 
     @abstractmethod
-    def persist_games(self, games: list[Game]) -> list[Game]:
-        """Write a batch of new games. Returns the persisted games."""
+    def upsert_games(self, games: list[Game]) -> list[Game]:
+        """Write the given games, reusing an existing primary key when the game is
+        already present and minting one otherwise. The caller decides which games
+        need writing. Returns the games written."""
         ...
 
