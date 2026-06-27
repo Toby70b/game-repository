@@ -27,22 +27,22 @@ its existing row instead of creating a duplicate.
 
 ## Test status
 
-`pytest` from `lambdas/ddb_import` → **26 pass, 10 fail**. The failures are
-**intentional** — each pins an outstanding bug below and turns green once fixed.
+`pytest` from `lambdas/ddb_import` → **31 pass, 5 fail**. The remaining failures
+are all in `test_steam_http_client`.
 
 ## Review comments — fixes to go green
 
+Earlier issues are **fixed**: the param-store stray `raise`, the dropped
+`modified_since`, the `now()` watermark, and the handler wiring. What's left is
+the `get_app_list` signature:
+
 | Failing test(s) | Bug | Fix |
 |---|---|---|
-| `test_aws_param_store::test_set_writes…`, `test_set_does_not_raise…` | `set_last_import_timestamp` always re-raises | Move the stray `raise` *inside* the `except` (`aws_param_store.py`). |
-| `test_steam_api::test_single_page…`, `test_multi_page…`, `test_forwards_modified_since…` | `fetch_games` drops `modified_since` | Forward it: `get_app_list(key, last_appid=…, modified_since=modified_since)` (`steam_api.py`). |
-| `test_steam_http_client::test_builds_url…`, `test_omits_last_appid…`, `test_returns_parsed_json` | `last_appid` became a required arg | Restore `last_appid: int \| None = None` (`steam_http_client.py`). |
-| `test_steam_http_client::test_omits_if_modified_since_when_none` | `if_modified_since` always sent (even `None`) | Add it to `params` only when not `None`. |
-| `test_game_import_service::test_writes_start_of_run_day_watermark…` | watermark written as `now()` | Use midnight UTC of the run day: `datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)` (`game_import_service.py`). |
+| `test_builds_url…`, `test_includes_last_appid_when_provided`, `test_omits_last_appid_when_none`, `test_returns_parsed_json` | `modified_since` is a required positional, so callers that omit it raise `TypeError` | Give it a default: `modified_since: str \| None = None`. |
+| `test_omits_if_modified_since_when_none` | `if_modified_since` is added to `params` even when `None` (sent as the literal `"None"`) | Add it only when not `None`, like `last_appid`. |
 
 ## Outstanding (not covered by tests / not in scope of this change)
 
-- **Handler wiring** — `ddb_import.py` must construct `AwsParamStore()` and pass `timestamp_store=…` to `GameImportService`, or the lambda `TypeError`s on cold start.
 - **Terraform** — add the `LAST_MODIFIED_PARAM` env var, create the SSM parameter **`last_import_job_timestamp` seeded to `0`** (so the first run backfills), and grant `ssm:GetParameter` / `ssm:PutParameter`.
 - **Type alignment** — the port types the timestamp as `str` while `AwsParamStore` uses `int`; the `%d` log lines also receive a `str`. Pick one type end-to-end.
 - **Backstop** — keep an occasional `if_modified_since=0` full reconcile, since "publishing always bumps `last_modified`" is implied but not documented.
