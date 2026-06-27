@@ -27,19 +27,10 @@ its existing row instead of creating a duplicate.
 
 ## Test status
 
-`pytest` from `lambdas/ddb_import` → **31 pass, 5 fail**. The remaining failures
-are all in `test_steam_http_client`.
-
-## Review comments — fixes to go green
-
-Earlier issues are **fixed**: the param-store stray `raise`, the dropped
-`modified_since`, the `now()` watermark, and the handler wiring. What's left is
-the `get_app_list` signature:
-
-| Failing test(s) | Bug | Fix |
-|---|---|---|
-| `test_builds_url…`, `test_includes_last_appid_when_provided`, `test_omits_last_appid_when_none`, `test_returns_parsed_json` | `modified_since` is a required positional, so callers that omit it raise `TypeError` | Give it a default: `modified_since: str \| None = None`. |
-| `test_omits_if_modified_since_when_none` | `if_modified_since` is added to `params` even when `None` (sent as the literal `"None"`) | Add it only when not `None`, like `last_appid`. |
+`pytest` from `lambdas/ddb_import` → **36 pass, 0 fail**. All previously pinned
+bugs are fixed: the param-store stray `raise`, the dropped `modified_since`, the
+`now()` watermark, the handler wiring, and the `get_app_list` signature
+(`modified_since` defaulted, `if_modified_since` only sent when set).
 
 ## Outstanding (not covered by tests / not in scope of this change)
 

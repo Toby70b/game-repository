@@ -17,7 +17,7 @@ class SteamHttpClient:
     IStoreService/GetAppList endpoint. Returns the raw parsed JSON response.
     """
 
-    def get_app_list(self, api_key: str, modified_since: str,  last_appid: int | None = None) -> dict:
+    def get_app_list(self, api_key: str, modified_since: str | None = None, last_appid: int | None = None) -> dict:
         params: dict[str, str | int] = {
             "key": api_key,
             "include_dlc": "false",
@@ -25,8 +25,10 @@ class SteamHttpClient:
             "include_videos": "false",
             "include_hardware": "false",
             "max_results": _MAX_RESULTS,
-            "if_modified_since": modified_since,
         }
+
+        if modified_since is not None:
+            params["if_modified_since"] = modified_since
 
         if last_appid is not None:
             params["last_appid"] = last_appid
