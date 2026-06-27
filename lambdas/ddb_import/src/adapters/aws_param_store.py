@@ -2,6 +2,7 @@ import logging
 import os
 
 import boto3
+from botocore.exceptions import ClientError
 
 from ports import LastImportTimestampStore
 
@@ -20,11 +21,13 @@ class AwsParamStore(LastImportTimestampStore):
     def get_last_import_timestamp(self) -> int | None:
         try:
             response = self._ssm.get_parameter(Name=self._param_name)
-            return int(response["Parameter"]["Value"])
-        except Exception as e:
-            logger.warning("Error when attempting to read param %s from aws parameter store: %s"
-                           , self._param_name, str(e))
-            return None
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ParameterNotFound":
+                logger.warning("Param %s is not set in parameter store", self._param_name)
+                return None
+            # Surface transient/permission errors instead of masking them as "unset".
+            raise
+        return int(response["Parameter"]["Value"])
 
     def set_last_import_timestamp(self, timestamp: int) -> None:
         try:

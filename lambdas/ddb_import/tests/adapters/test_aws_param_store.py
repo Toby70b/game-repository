@@ -1,5 +1,8 @@
 from unittest.mock import MagicMock
 
+import pytest
+from botocore.exceptions import ClientError
+
 from adapters.aws_param_store import AwsParamStore
 
 
@@ -9,6 +12,10 @@ def _store() -> AwsParamStore:
     store._param_name = "/test/last-import"
     store._ssm = MagicMock()
     return store
+
+
+def _client_error(code: str) -> ClientError:
+    return ClientError({"Error": {"Code": code, "Message": "boom"}}, "GetParameter")
 
 
 class TestAwsParamStore:
@@ -22,9 +29,16 @@ class TestAwsParamStore:
 
     def test_get_returns_none_when_param_missing(self):
         store = _store()
-        store._ssm.get_parameter.side_effect = Exception("ParameterNotFound")
+        store._ssm.get_parameter.side_effect = _client_error("ParameterNotFound")
 
         assert store.get_last_import_timestamp() is None
+
+    def test_get_propagates_unexpected_errors(self):
+        store = _store()
+        store._ssm.get_parameter.side_effect = _client_error("AccessDeniedException")
+
+        with pytest.raises(ClientError):
+            store.get_last_import_timestamp()
 
     def test_set_writes_overwritable_string_param(self):
         store = _store()

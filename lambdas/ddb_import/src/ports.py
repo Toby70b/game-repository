@@ -24,8 +24,9 @@ class GameSource(ABC):
     """Outbound port: something that can provide a stream of games."""
 
     @abstractmethod
-    def fetch_games(self, modified_since: str | None = None) -> Iterator[Game]:
-        """Yield Game objects one at a time. Pass last_appid to resume from a specific offset."""
+    def fetch_games(self, modified_since: int | None = None) -> Iterator[Game]:
+        """Yield Game objects one at a time. Pass modified_since (a unix timestamp)
+        to fetch only games created or changed since then."""
         ...
 
 
@@ -50,11 +51,11 @@ class LastImportTimestampStore(ABC):
     """Outbound port: used to manage the last import timestamp."""
 
     @abstractmethod
-    def get_last_import_timestamp(self) -> str | None:
-        """Return the last import timestamp as a string, or None if not set."""
+    def get_last_import_timestamp(self) -> int | None:
+        """Return the last import timestamp as a unix timestamp, or None if unset."""
         ...
 
     @abstractmethod
-    def set_last_import_timestamp(self, timestamp: str) -> None:
-        """Set the last import timestamp to the given string."""
+    def set_last_import_timestamp(self, timestamp: int) -> None:
+        """Persist the last import timestamp (a unix timestamp)."""
         ...

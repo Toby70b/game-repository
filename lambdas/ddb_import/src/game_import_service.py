@@ -28,8 +28,6 @@ class GameImportService(ImportGamesUseCase):
         if last_import_timestamp is None:
             raise RuntimeError("Last import timestamp could not be retrieved; cannot proceed with import")
 
-
-
         total_fetched = 0
         total_written = 0
         batch: list[Game] = []
@@ -63,6 +61,6 @@ class GameImportService(ImportGamesUseCase):
 
     def __update_last_modified_timestamp(self) -> None:
         start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        new_timestamp = str(int(start_of_day.timestamp()))
-        logger.info("Updating last modified timestamp param to %d", new_timestamp)
+        new_timestamp = int(start_of_day.timestamp())
+        logger.info("Updating last import timestamp param to %d", new_timestamp)
         self._timestamp_store.set_last_import_timestamp(new_timestamp)

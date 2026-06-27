@@ -11,7 +11,7 @@ def game(steam_id: str, title: str) -> Game:
     return Game(steam_game_id=steam_id, game_title=title)
 
 
-def _store(last_timestamp="1000") -> MagicMock:
+def _store(last_timestamp=1000) -> MagicMock:
     store = MagicMock()
     store.get_last_import_timestamp.return_value = last_timestamp
     return store
@@ -132,10 +132,10 @@ class TestGameImportService:
         repo = MagicMock()
         repo.existing_titles.return_value = {}
 
-        svc = self._make_service(source=source, repo=repo, timestamp_store=_store("1717200000"))
+        svc = self._make_service(source=source, repo=repo, timestamp_store=_store(1717200000))
         svc.import_games()
 
-        source.fetch_games.assert_called_once_with(modified_since="1717200000")
+        source.fetch_games.assert_called_once_with(modified_since=1717200000)
 
     def test_raises_and_skips_fetch_when_timestamp_missing(self):
         source = MagicMock()
@@ -154,7 +154,7 @@ class TestGameImportService:
         source.fetch_games.return_value = iter([])
         repo = MagicMock()
         repo.existing_titles.return_value = {}
-        store = _store("1000")
+        store = _store(1000)
 
         svc = self._make_service(source=source, repo=repo, timestamp_store=store)
 
@@ -165,7 +165,7 @@ class TestGameImportService:
 
         # The new watermark should be midnight UTC of the run day, not the exact time.
         start_of_day = datetime(2026, 6, 27, 0, 0, 0, tzinfo=timezone.utc)
-        expected = str(int(start_of_day.timestamp()))
+        expected = int(start_of_day.timestamp())
         store.set_last_import_timestamp.assert_called_once_with(expected)
 
     def test_watermark_not_written_when_persistence_fails(self):
@@ -174,7 +174,7 @@ class TestGameImportService:
         repo = MagicMock()
         repo.existing_titles.return_value = {}
         repo.upsert_games.side_effect = RuntimeError("ddb down")
-        store = _store("1000")
+        store = _store(1000)
 
         svc = self._make_service(source=source, repo=repo, timestamp_store=store)
 
