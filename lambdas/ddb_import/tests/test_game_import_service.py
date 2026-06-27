@@ -1,4 +1,7 @@
-from unittest.mock import MagicMock
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from domain.game import Game
 from game_import_service import GameImportService
@@ -8,13 +11,19 @@ def game(steam_id: str, title: str) -> Game:
     return Game(steam_game_id=steam_id, game_title=title)
 
 
+def _store(last_timestamp="1000") -> MagicMock:
+    store = MagicMock()
+    store.get_last_import_timestamp.return_value = last_timestamp
+    return store
+
+
 class TestGameImportService:
 
     def _make_service(self, *, source=None, repo=None, timestamp_store=None):
         return GameImportService(
             source=source or MagicMock(),
             repo=repo or MagicMock(),
-            timestamp_store=timestamp_store or MagicMock(),
+            timestamp_store=timestamp_store or _store(),
         )
 
     # ---- No games from source ----
@@ -115,28 +124,60 @@ class TestGameImportService:
         batch_sizes = [len(call.args[0]) for call in repo.upsert_games.call_args_list]
         assert batch_sizes == [100, 100, 50]
 
-    # ---- Cursor / last_appid ----
+    # ---- Watermark (if_modified_since) ----
 
-    def test_cursor_is_max_existing_id(self):
-        source = MagicMock()
-        source.fetch_games.return_value = iter([])
-        repo = MagicMock()
-        repo.existing_titles.return_value = {"5": "a", "200": "b", "30": "c"}
-
-        svc = self._make_service(source=source, repo=repo)
-        svc.import_games()
-
-        source.fetch_games.assert_called_once_with(last_appid=200)
-
-    def test_cursor_is_none_when_no_existing(self):
+    def test_passes_stored_timestamp_as_modified_since(self):
         source = MagicMock()
         source.fetch_games.return_value = iter([])
         repo = MagicMock()
         repo.existing_titles.return_value = {}
 
-        svc = self._make_service(source=source, repo=repo)
+        svc = self._make_service(source=source, repo=repo, timestamp_store=_store("1717200000"))
         svc.import_games()
 
-        source.fetch_games.assert_called_once_with(last_appid=None)
+        source.fetch_games.assert_called_once_with(modified_since="1717200000")
 
+    def test_raises_and_skips_fetch_when_timestamp_missing(self):
+        source = MagicMock()
+        source.fetch_games.return_value = iter([])
+        repo = MagicMock()
+        repo.existing_titles.return_value = {}
 
+        svc = self._make_service(source=source, repo=repo, timestamp_store=_store(last_timestamp=None))
+
+        with pytest.raises(RuntimeError):
+            svc.import_games()
+        source.fetch_games.assert_not_called()
+
+    def test_writes_start_of_run_day_watermark_on_success(self):
+        source = MagicMock()
+        source.fetch_games.return_value = iter([])
+        repo = MagicMock()
+        repo.existing_titles.return_value = {}
+        store = _store("1000")
+
+        svc = self._make_service(source=source, repo=repo, timestamp_store=store)
+
+        fixed_now = datetime(2026, 6, 27, 14, 30, 0, tzinfo=timezone.utc)
+        with patch("game_import_service.datetime") as mock_datetime:
+            mock_datetime.now.return_value = fixed_now
+            svc.import_games()
+
+        # The new watermark should be midnight UTC of the run day, not the exact time.
+        start_of_day = datetime(2026, 6, 27, 0, 0, 0, tzinfo=timezone.utc)
+        expected = str(int(start_of_day.timestamp()))
+        store.set_last_import_timestamp.assert_called_once_with(expected)
+
+    def test_watermark_not_written_when_persistence_fails(self):
+        source = MagicMock()
+        source.fetch_games.return_value = iter([game("10", "Game A")])
+        repo = MagicMock()
+        repo.existing_titles.return_value = {}
+        repo.upsert_games.side_effect = RuntimeError("ddb down")
+        store = _store("1000")
+
+        svc = self._make_service(source=source, repo=repo, timestamp_store=store)
+
+        with pytest.raises(RuntimeError):
+            svc.import_games()
+        store.set_last_import_timestamp.assert_not_called()
