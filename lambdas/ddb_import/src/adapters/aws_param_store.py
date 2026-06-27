@@ -37,4 +37,4 @@ class AwsParamStore(LastImportTimestampStore):
             logger.info("Updated %s to %d", self._param_name, timestamp)
         except Exception as e:
             logger.error("Failed to update parameter %s: %s", self._param_name, str(e))
-        raise
+            raise

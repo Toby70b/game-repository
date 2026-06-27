@@ -31,14 +31,14 @@ class SteamApiAdapter(GameSource):
             logger.error(f"Failed to retrieve Steam API key from SSM parameter '{param_name}': {e}")
             raise RuntimeError(f"Could not retrieve Steam API key from SSM parameter '{param_name}'") from e
 
-    def fetch_games(self, last_appid: int | None = None) -> Iterator[Game]:
-        cursor = last_appid
+    def fetch_games(self, modified_since: str | None = None) -> Iterator[Game]:
+        last_app_id = None
         page = 0
         have_more_results = True
 
         while have_more_results:
             page += 1
-            data = self._http.get_app_list(self._api_key, last_appid=cursor)
+            data = self._http.get_app_list(self._api_key, last_appid=last_app_id, modified_since=modified_since)
             response = data.get("response", {})
             apps: list[dict] = response.get("apps", [])
 
@@ -55,6 +55,6 @@ class SteamApiAdapter(GameSource):
 
             if not response.get("have_more_results"):
                 have_more_results = False
-            cursor = response.get("last_appid")
+            last_app_id = response.get("last_appid")
 
 

@@ -28,13 +28,13 @@ class GameImportService(ImportGamesUseCase):
         if last_import_timestamp is None:
             raise RuntimeError("Last import timestamp could not be retrieved; cannot proceed with import")
 
-        last_appid = max((int(sid) for sid in existing), default=None)
+
 
         total_fetched = 0
         total_written = 0
         batch: list[Game] = []
 
-        for game in self._source.fetch_games(last_appid=last_appid):
+        for game in self._source.fetch_games(modified_since=last_import_timestamp):
             total_fetched += 1
 
             if existing.get(game.steam_game_id) == game.game_title:

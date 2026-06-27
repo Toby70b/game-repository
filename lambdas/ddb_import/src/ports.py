@@ -24,7 +24,7 @@ class GameSource(ABC):
     """Outbound port: something that can provide a stream of games."""
 
     @abstractmethod
-    def fetch_games(self, last_appid: int | None = None) -> Iterator[Game]:
+    def fetch_games(self, modified_since: str | None = None) -> Iterator[Game]:
         """Yield Game objects one at a time. Pass last_appid to resume from a specific offset."""
         ...
 
