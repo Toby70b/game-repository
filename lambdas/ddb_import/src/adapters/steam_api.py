@@ -38,7 +38,7 @@ class SteamApiAdapter(GameSource):
 
         while have_more_results:
             page += 1
-            data = self._http.get_app_list(self._api_key, last_appid=last_app_id, modified_since=modified_since)
+            data = self._http.get_app_list(self._api_key,modified_since=modified_since, last_appid=last_app_id )
             response = data.get("response", {})
             apps: list[dict] = response.get("apps", [])
 

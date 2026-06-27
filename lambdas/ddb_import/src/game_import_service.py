@@ -62,6 +62,7 @@ class GameImportService(ImportGamesUseCase):
         return summary
 
     def __update_last_modified_timestamp(self) -> None:
-        new_timestamp = str(int(datetime.now(timezone.utc).timestamp()))
+        start_of_day = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        new_timestamp = str(int(start_of_day.timestamp()))
         logger.info("Updating last modified timestamp param to %d", new_timestamp)
         self._timestamp_store.set_last_import_timestamp(new_timestamp)
