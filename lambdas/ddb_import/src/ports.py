@@ -24,8 +24,9 @@ class GameSource(ABC):
     """Outbound port: something that can provide a stream of games."""
 
     @abstractmethod
-    def fetch_games(self, last_appid: int | None = None) -> Iterator[Game]:
-        """Yield Game objects one at a time. Pass last_appid to resume from a specific offset."""
+    def fetch_games(self, modified_since: int | None = None) -> Iterator[Game]:
+        """Yield Game objects one at a time. Pass modified_since (a unix timestamp)
+        to fetch only games created or changed since then."""
         ...
 
 
@@ -33,12 +34,28 @@ class GameRepository(ABC):
     """Outbound port: something that can persist games."""
 
     @abstractmethod
-    def retrieve_existing_steam_ids(self) -> set[str]:
-        """Return the set of all steam_game_ids already existing within the repository."""
+    def existing_titles(self) -> dict[str, str]:
+        """Return a map of steam_game_id -> current game_title for every game
+        already in the repository."""
         ...
 
     @abstractmethod
-    def persist_games(self, games: list[Game]) -> list[Game]:
-        """Write a batch of new games. Returns the persisted games."""
+    def upsert_games(self, games: list[Game]) -> list[Game]:
+        """Write the given games, reusing an existing primary key when the game is
+        already present and minting one otherwise. The caller decides which games
+        need writing. Returns the games written."""
         ...
 
+
+class LastImportTimestampStore(ABC):
+    """Outbound port: used to manage the last import timestamp."""
+
+    @abstractmethod
+    def get_last_import_timestamp(self) -> int | None:
+        """Return the last import timestamp as a unix timestamp, or None if unset."""
+        ...
+
+    @abstractmethod
+    def set_last_import_timestamp(self, timestamp: int) -> None:
+        """Persist the last import timestamp (a unix timestamp)."""
+        ...

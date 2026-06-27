@@ -237,9 +237,19 @@ resource "aws_iam_role_policy" "ddb_import_lambda_policy" {
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = ["ssm:GetParameter"]
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+        ]
         Resource = local.steam_api_key_param_arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:PutParameter",
+        ]
+        Resource = aws_ssm_parameter.last_import_job_timestamp.arn
       },
       {
         Effect = "Allow"
@@ -272,6 +282,7 @@ resource "aws_lambda_function" "ddb_import" {
       STEAM_GAME_ID_INDEX = local.steam_gsi_name
       STEAM_API_KEY_PARAM = local.steam_api_key_param_name
       STEAM_API_BASE_URL  = var.steam_api_base_url
+      LAST_MODIFIED_PARAM = aws_ssm_parameter.last_import_job_timestamp.name
     }
   }
 }
@@ -419,6 +430,27 @@ resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
   # Default setting - reduce throttle errors during bulk load
   parallelization_factor = 1
 
+  # Publish new games (INSERT) and title updates (MODIFY). Removals are filtered
+  # out at the source so they never reach the lambda.
+  filter_criteria {
+    filter {
+      pattern = jsonencode({ eventName = ["INSERT", "MODIFY"] })
+    }
+  }
+
   tags = var.tags
 }
+
+# --- SSM --- #
+resource "aws_ssm_parameter" "last_import_job_timestamp" {
+  name        = "/game-repository/last-import-job-timestamp"
+  type        = "String"
+  value       = "0"
+  description = "Timestamp of the last successful import job run. Used by the import job to find newly update Steam games to import"
+
+  lifecycle { ignore_changes = [value] } # ignore changes to the value so that Terraform doesn't overwrite it on subsequent runs
+
+  tags = var.tags
+}
+
 

@@ -60,6 +60,40 @@ class TestSteamHttpClient:
             url = mock_urlopen.call_args[0][0]
             assert "last_appid" not in url
 
+    def test_includes_if_modified_since_when_provided(self):
+        response_body = json.dumps({
+            "response": {"apps": [], "have_more_results": False}
+        }).encode()
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = response_body
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
+
+        with patch("adapters.steam_http_client.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+            client = SteamHttpClient()
+            client.get_app_list("key", last_appid=None, modified_since="1719446400")
+
+            url = mock_urlopen.call_args[0][0]
+            assert "if_modified_since=1719446400" in url
+
+    def test_omits_if_modified_since_when_none(self):
+        response_body = json.dumps({
+            "response": {"apps": [], "have_more_results": False}
+        }).encode()
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = response_body
+        mock_response.__enter__.return_value = mock_response
+        mock_response.__exit__.return_value = False
+
+        with patch("adapters.steam_http_client.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+            client = SteamHttpClient()
+            client.get_app_list("key", last_appid=None, modified_since=None)
+
+            url = mock_urlopen.call_args[0][0]
+            assert "if_modified_since" not in url
+
     def test_returns_parsed_json(self):
         expected = {"response": {"apps": [{"appid": 1, "name": "X"}], "have_more_results": False}}
         response_body = json.dumps(expected).encode()

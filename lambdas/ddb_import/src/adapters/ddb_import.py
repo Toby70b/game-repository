@@ -5,6 +5,7 @@ Lambda handler — inbound adapter. Translates the Lambda invocation into a call
 import logging
 import os
 
+from adapters.aws_param_store import AwsParamStore
 from ports import ImportGamesUseCase
 from game_import_service import GameImportService
 from adapters.steam_api import SteamApiAdapter
@@ -17,5 +18,6 @@ def handler(event, context):
     use_case: ImportGamesUseCase = GameImportService(
         source=SteamApiAdapter(),
         repo=DynamoDbGameRepository(),
+        timestamp_store=AwsParamStore(),
     )
     return use_case.import_games()

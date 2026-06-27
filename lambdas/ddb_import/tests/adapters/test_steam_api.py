@@ -39,7 +39,8 @@ class TestSteamApiAdapter:
             Game(steam_game_id="10", game_title="Game A"),
             Game(steam_game_id="20", game_title="Game B"),
         ]
-        http.get_app_list.assert_called_once_with("fake-key", last_appid=None)
+        # last_appid starts as None (pure pagination cursor); modified_since forwarded.
+        http.get_app_list.assert_called_once_with("fake-key", last_appid=None, modified_since=None)
 
     def test_multi_page_pagination(self):
         http = MagicMock()
@@ -64,8 +65,8 @@ class TestSteamApiAdapter:
 
         assert len(games) == 2
         assert http.get_app_list.call_count == 2
-        http.get_app_list.assert_any_call("fake-key", last_appid=None)
-        http.get_app_list.assert_any_call("fake-key", last_appid=10)
+        http.get_app_list.assert_any_call("fake-key", last_appid=None, modified_since=None)
+        http.get_app_list.assert_any_call("fake-key", last_appid=10, modified_since=None)
 
     def test_skips_apps_without_name(self):
         http = MagicMock()
@@ -102,16 +103,18 @@ class TestSteamApiAdapter:
 
         assert games == [Game(steam_game_id="10", game_title="Has ID")]
 
-    def test_passes_last_appid_cursor(self):
+    def test_forwards_modified_since_to_http_client(self):
+        """The modified_since watermark must reach Steam; pagination still starts
+        at last_appid=None and continues via the response's last_appid."""
         http = MagicMock()
         http.get_app_list.return_value = {
             "response": {"apps": [], "have_more_results": False}
         }
 
         adapter = _build_adapter(http)
-        list(adapter.fetch_games(last_appid=500))
+        list(adapter.fetch_games(modified_since=500))
 
-        http.get_app_list.assert_called_once_with("fake-key", last_appid=500)
+        http.get_app_list.assert_called_once_with("fake-key", last_appid=None, modified_since=500)
 
     def test_empty_response(self):
         http = MagicMock()
@@ -121,4 +124,3 @@ class TestSteamApiAdapter:
         games = list(adapter.fetch_games())
 
         assert games == []
-
