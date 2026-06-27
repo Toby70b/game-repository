@@ -34,6 +34,17 @@ def make_insert_record(event_id: str = "evt-1", **image_fields) -> dict:
     }
 
 
+def make_modify_record(event_id: str = "evt-mod", **image_fields) -> dict:
+    """A title update — carries a NewImage but is a MODIFY, not a new game."""
+    return {
+        "eventID": event_id,
+        "eventName": "MODIFY",
+        "dynamodb": {
+            "NewImage": dynamo_image(**image_fields),
+        },
+    }
+
+
 def make_record_no_new_image(event_id: str = "evt-del", event_name: str = "REMOVE") -> dict:
     return {
         "eventID": event_id,
@@ -203,6 +214,38 @@ class TestLambdaHandler:
         ]
         ddb_stream_publish.lambda_handler({"Records": records}, None)
         self.sns_client.publish_batch.assert_not_called()
+
+    # --- Event-type routing (INSERT vs MODIFY) ---
+
+    def test_insert_published_as_new_game_item(self):
+        event = {"Records": [make_insert_record("evt-1", game_id="abc", game_title="Portal")]}
+        ddb_stream_publish.lambda_handler(event, None)
+
+        entry = self.sns_client.publish_batch.call_args.kwargs["PublishBatchRequestEntries"][0]
+        assert entry["Subject"] == "new_game_item"
+        assert entry["MessageAttributes"]["event_type"]["StringValue"] == "new_game_item"
+        assert json.loads(entry["Message"])["event_type"] == "new_game_item"
+
+    def test_modify_published_as_game_updated(self):
+        # A title update carries a NewImage and is published under its own type.
+        event = {"Records": [make_modify_record("evt-mod", game_id="abc", game_title="Portal 2")]}
+        ddb_stream_publish.lambda_handler(event, None)
+
+        entry = self.sns_client.publish_batch.call_args.kwargs["PublishBatchRequestEntries"][0]
+        assert entry["Subject"] == "game_updated"
+        assert entry["MessageAttributes"]["event_type"]["StringValue"] == "game_updated"
+        assert json.loads(entry["Message"])["event_type"] == "game_updated"
+
+    def test_insert_and_modify_both_published_with_their_types(self):
+        records = [
+            make_insert_record("evt-1", game_id="a", game_title="Game A"),
+            make_modify_record("evt-2", game_id="b", game_title="Game B renamed"),
+        ]
+        ddb_stream_publish.lambda_handler({"Records": records}, None)
+
+        entries = self.sns_client.publish_batch.call_args.kwargs["PublishBatchRequestEntries"]
+        by_id = {json.loads(e["Message"])["event_id"]: e["Subject"] for e in entries}
+        assert by_id == {"evt-1": "new_game_item", "evt-2": "game_updated"}
 
     # --- Chunking ---
 
