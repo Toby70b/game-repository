@@ -2,7 +2,7 @@
 
 An AWS-based pipeline that maintains a DynamoDB table of Steam games. Scheduled Lambda functions keep the data
 fresh — one imports new/updated games from the Steam Web API daily, one exports a snapshot of the table to S3, and one
-streams new game additions to an SNS topic in real time.
+streams new games and title updates to an SNS topic in real time as distinct event types.
 
 ---
 
@@ -29,12 +29,13 @@ streams new game additions to an SNS topic in real time.
 | `aws_s3_bucket.games_export`                      | Snapshot bucket with versioning and lifecycle rules                                                                       |
 | `aws_lambda_function.ddb_import`                  | Imports new Steam games into DynamoDB                                                                                     |
 | `aws_lambda_function.ddb_export`                  | Exports the full table to S3 as gzipped NDJSON                                                                            |
-| `aws_lambda_function.new_game_item_publisher`     | Reads new-item events from the DynamoDB stream and publishes them to SNS in batches                                       |
-| `module.new_game_items`                           | SNS topic (`new-game-items`) that receives new game item events from the stream publisher                                 |
-| `aws_lambda_event_source_mapping` (stream)        | Wires the DynamoDB stream to `new-game-item-publisher` (batch size 100, window 5 s)                                       |
+| `aws_lambda_function.game_event_publisher`        | Reads insert/update events from the DynamoDB stream; publishes new games (`new_game_item`) and title updates (`game_updated`) to SNS as distinct event types |
+| `module.new_game_items`                           | SNS topic (`new-game-items`) that receives new-game and title-update events from the stream publisher                     |
+| `aws_lambda_event_source_mapping` (stream)        | Wires the DynamoDB stream to `game-event-publisher` (batch size 100, window 5 s); filters to `eventName ∈ [INSERT, MODIFY]` |
 | `aws_scheduler_schedule.daily_ddb_import`         | Triggers import Lambda at **22:00 UTC** daily                                                                             |
 | `aws_scheduler_schedule.daily_ddb_export`         | Triggers export Lambda at **00:00 UTC** daily                                                                             |
 | `aws_ssm_parameter.steam_api_key`                 | Pre-created manually — Terraform constructs the ARN from known values and never reads the secret, keeping it out of state |
+| `aws_ssm_parameter.last_import_job_timestamp`     | Import watermark (unix timestamp). Seeded to `0`; updated by the import Lambda each run. `ignore_changes` on `value` so applies don't reset it |
 
 ---
 
@@ -43,29 +44,31 @@ streams new game additions to an SNS topic in real time.
 The `ddb_import` service is structured around hexagonal (ports & adapters) architecture:
 
 - **Domain** (`domain/game.py`) — `Game` dataclass (`steam_game_id`, `game_title`). No framework dependencies.
-- **Ports** (`ports.py`) — Abstract interfaces: `ImportGamesUseCase` (inbound), `GameSource` and `GameRepository` (
-  outbound).
-- **Service** (`game_import_service.py`) — `GameImportService` implements the use case. Fetches all pages from Steam, deduplicates
-  against existing records using the highest known `steam_game_id` as a cursor, and writes new games in batches.
+- **Ports** (`ports.py`) — Abstract interfaces: `ImportGamesUseCase` (inbound); `GameSource`, `GameRepository`, and
+  `LastImportTimestampStore` (outbound).
+- **Service** (`game_import_service.py`) — `GameImportService` implements the use case. Reads the last-import watermark,
+  fetches games changed since then (`if_modified_since`), and upserts them in batches — inserting new games and updating
+  titles that changed — then advances the watermark (to the start of the run day) once the run succeeds.
 - **Adapters**:
     - `adapters/ddb_import.py` — Lambda handler; composes the service and invokes it.
     - `adapters/steam_api.py` — Retrieves the API key from SSM, delegates HTTP to `SteamHttpClient`, maps responses to
       `Game` objects.
-    - `adapters/steam_http_client.py` — Builds and sends paginated requests to `IStoreService/GetAppList/v1`, logs
-      request/response details (API key is redacted).
-    - `adapters/dynamodb_repo.py` — Scans the `gsi_steam_game_id` GSI for deduplication, batch-writes new items using
-      `GameItem` as the persistence entity.
+    - `adapters/steam_http_client.py` — Builds and sends paginated requests to `IStoreService/GetAppList/v1` (filtered by
+      `if_modified_since`), logs request/response details (API key is redacted).
+    - `adapters/dynamodb_repo.py` — Snapshots existing games from the `gsi_steam_game_id` GSI, then upserts via batch
+      write — reusing the existing primary key on title changes so rows are updated, not duplicated.
+    - `adapters/aws_param_store.py` — Reads and writes the last-import watermark in SSM Parameter Store.
 
 ---
 
 ## Stream Publish Lambda
 
-The `ddb_stream_publish` Lambda (`new-game-item-publisher`) is triggered by the DynamoDB stream on the `Games` table whenever new items are inserted.
+The `ddb_stream_publish` Lambda (`game-event-publisher`) is triggered by the DynamoDB stream on the `Games` table whenever a game is inserted or has its title updated.
 
-- **Trigger** — DynamoDB Streams (`NEW_IMAGE`), event-source mapping with batch size 100 and a 5-second batching window.
-- **Processing** — For each record the handler deserialises the DynamoDB JSON `NewImage`, wraps it in a structured game event (fields: `event_id`, `event_name`, `event_timestamp`, `game_data`), and accumulates entries into SNS `publish_batch` calls (max 10 per batch, the SNS limit).
-- **Destination** — SNS topic `new-game-items`. Downstream consumers can subscribe to this topic to react to new game additions in real time.
-- **Error handling** — Records without a `NewImage` (e.g. deletes/updates that slip through) are logged as warnings and skipped rather than failing the batch.
+- **Trigger** — DynamoDB Streams (`NEW_IMAGE`), event-source mapping with batch size 100 and a 5-second batching window, filtered to `INSERT` and `MODIFY` events.
+- **Processing** — For each record the handler deserialises the DynamoDB JSON `NewImage` and wraps it in a structured game event (fields: `event_id`, `event_name`, `event_type`, `event_timestamp`, `game_data`). Inserts are published as `new_game_item` and title updates as `game_updated`; the type is set both as the SNS `Subject` and an `event_type` message attribute. Entries are accumulated into `publish_batch` calls (max 10 per batch, the SNS limit).
+- **Destination** — SNS topic `new-game-items`. Consumers subscribe with a filter policy on the `event_type` message attribute to receive only new games, only title updates, or both.
+- **Error handling** — Removals are filtered out (at the source mapping and in the handler); records without a `NewImage` are logged and skipped. A partial SNS batch failure is logged and raised so the records are retried.
 
 ---
 
@@ -99,8 +102,9 @@ Terraform will:
 
 - Create the `Games` DynamoDB table
 - Create the S3 snapshot bucket
-- Package and deploy both Lambda functions
-- Configure EventBridge schedules for both jobs
+- Create the import watermark SSM parameter (`last-import-job-timestamp`, seeded to `0`)
+- Package and deploy the Lambda functions
+- Configure EventBridge schedules for the scheduled jobs
 
 ### 3. When finished destroy
 
@@ -125,7 +129,7 @@ required.
 |---------------------------|-----------------------------------------------------------|
 | `ddb-games-export`        | `lambdas/ddb_export/ddb_export.py` (single file)          |
 | `ddb-games-import`        | `lambdas/ddb_import/src/` (entire directory)              |
-| `new-game-item-publisher` | `lambdas/ddb_stream_publish/ddb_stream_publish.py` (single file) |
+| `game-event-publisher` | `lambdas/ddb_stream_publish/ddb_stream_publish.py` (single file) |
 
 ---
 
@@ -207,7 +211,7 @@ aws --endpoint-url=http://localhost:4566 --region eu-west-2 lambda invoke \
   /dev/stdout
 ```
 
-> The `new-game-item-publisher` Lambda is triggered automatically by the DynamoDB stream whenever the import Lambda writes new items — no manual invocation is required.
+> The `game-event-publisher` Lambda is triggered automatically by the DynamoDB stream whenever the import Lambda writes new items — no manual invocation is required.
 
 ### Verify Data
 
