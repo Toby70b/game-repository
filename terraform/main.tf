@@ -340,18 +340,18 @@ module "new_game_items" {
 }
 
 # --- Lambda (publish to SNS) --- #
-data "archive_file" "ddb_new_game_item_publisher_lambda" {
+data "archive_file" "game_event_publisher_lambda" {
   type        = "zip"
   source_file = "${path.module}/../lambdas/ddb_stream_publish/ddb_stream_publish.py"
   output_path = "${path.module}/files/ddb_stream_publish.zip"
 }
 
-resource "aws_lambda_function" "new_game_item_publisher" {
-  filename         = data.archive_file.ddb_new_game_item_publisher_lambda.output_path
-  source_code_hash = data.archive_file.ddb_new_game_item_publisher_lambda.output_base64sha256
+resource "aws_lambda_function" "game_event_publisher" {
+  filename         = data.archive_file.game_event_publisher_lambda.output_path
+  source_code_hash = data.archive_file.game_event_publisher_lambda.output_base64sha256
 
-  function_name = "new-game-item-publisher"
-  role          = aws_iam_role.new_game_item_publisher.arn
+  function_name = "game-event-publisher"
+  role          = aws_iam_role.game_event_publisher.arn
   handler       = "ddb_stream_publish.lambda_handler"
   runtime       = "python3.12"
   timeout       = 30
@@ -365,8 +365,8 @@ resource "aws_lambda_function" "new_game_item_publisher" {
   }
 }
 
-resource "aws_iam_role" "new_game_item_publisher" {
-  name = "new-game-item-publisher-role"
+resource "aws_iam_role" "game_event_publisher" {
+  name = "game-event-publisher-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -380,10 +380,10 @@ resource "aws_iam_role" "new_game_item_publisher" {
   tags = var.tags
 }
 
-resource "aws_iam_role_policy" "new_game_item_publisher" {
-  name = "new-game-item-publisher-policy"
+resource "aws_iam_role_policy" "game_event_publisher" {
+  name = "game-event-publisher-policy"
 
-  role = aws_iam_role.new_game_item_publisher.id
+  role = aws_iam_role.game_event_publisher.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -419,9 +419,16 @@ resource "aws_iam_role_policy" "new_game_item_publisher" {
   })
 }
 
-resource "aws_lambda_event_source_mapping" "new_game_item_stream" {
+# Preserve the existing event source mapping through the rename so it keeps its
+# stream position (a recreated mapping would re-read from TRIM_HORIZON).
+moved {
+  from = aws_lambda_event_source_mapping.new_game_item_stream
+  to   = aws_lambda_event_source_mapping.game_event_stream
+}
+
+resource "aws_lambda_event_source_mapping" "game_event_stream" {
   event_source_arn  = module.games_table.stream_arn
-  function_name     = aws_lambda_function.new_game_item_publisher.arn
+  function_name     = aws_lambda_function.game_event_publisher.arn
   starting_position = "TRIM_HORIZON" # process all existing stream records on deployment
 
   # Batch settings - need to consider initial setup scenario
