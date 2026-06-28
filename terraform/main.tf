@@ -419,13 +419,6 @@ resource "aws_iam_role_policy" "game_event_publisher" {
   })
 }
 
-# Preserve the existing event source mapping through the rename so it keeps its
-# stream position (a recreated mapping would re-read from TRIM_HORIZON).
-moved {
-  from = aws_lambda_event_source_mapping.new_game_item_stream
-  to   = aws_lambda_event_source_mapping.game_event_stream
-}
-
 resource "aws_lambda_event_source_mapping" "game_event_stream" {
   event_source_arn  = module.games_table.stream_arn
   function_name     = aws_lambda_function.game_event_publisher.arn
